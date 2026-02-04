@@ -45,7 +45,8 @@ export function useLiveTrades(address: string | null) {
       setError(null);
       try {
         const res = await fetch(`/api/users/${address}/trades`, {
-          signal: abort.signal
+          signal: abort.signal,
+          credentials: 'include'
         });
         if (!res.ok) {
           throw new Error(`Failed to fetch trades: ${res.status}`);

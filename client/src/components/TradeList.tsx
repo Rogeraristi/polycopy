@@ -5,6 +5,7 @@ interface TradeListProps {
   trades: Trade[];
   onCopy: (trade: Trade) => void;
   isCopying: boolean;
+  canCopy?: boolean;
 }
 
 function formatOutcome(outcome?: string | null) {
@@ -27,7 +28,7 @@ function getKey(trade: Trade) {
     .join(':');
 }
 
-export function TradeList({ trades, onCopy, isCopying }: TradeListProps) {
+export function TradeList({ trades, onCopy, isCopying, canCopy = true }: TradeListProps) {
   if (trades.length === 0) {
     return (
       <div className="card p-8 text-center">
@@ -82,9 +83,9 @@ export function TradeList({ trades, onCopy, isCopying }: TradeListProps) {
             <button
               className="self-start mt-2 inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-primary/80 hover:bg-primary rounded-full transition"
               onClick={() => onCopy(trade)}
-              disabled={isCopying}
+              disabled={isCopying || !canCopy}
             >
-              {isCopying ? 'Preparing order…' : 'Copy trade'}
+              {isCopying ? 'Preparing order…' : canCopy ? 'Copy trade' : 'Connect wallet to copy'}
             </button>
           </article>
         );
