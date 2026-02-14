@@ -41,6 +41,7 @@ export function useSession(): UseSessionResult {
   const [error, setError] = useState<string | null>(null);
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL;
+  console.log('VITE_API_BASE_URL:', API_BASE);
   const refresh = useCallback(async () => {
     setIsLoading(true);
     setError(null);
@@ -68,8 +69,9 @@ export function useSession(): UseSessionResult {
     const hash = window.location.hash || '';
     const redirectTarget = `${path}${query}${hash}` || '/';
     const encodedRedirect = encodeURIComponent(redirectTarget);
-    // Always use ?redirect= as a query parameter
-    window.location.href = `${API_BASE}/api/auth/google?redirect=${encodedRedirect}`;
+    const loginUrl = `${API_BASE}/api/auth/google?redirect=${encodedRedirect}`;
+    console.log('Login redirect:', loginUrl);
+    window.location.href = loginUrl;
   }, [API_BASE]);
 
   const logout = useCallback(async () => {

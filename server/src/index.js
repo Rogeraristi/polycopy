@@ -638,28 +638,8 @@ async function fetchFallbackLeaderboard(limit = LEADERBOARD_LIMIT) {
 }
 
 async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
-  if (firestore) {
-    try {
-      const docRef = firestore.collection(FIRESTORE_LEADERBOARD_COLLECTION).doc(FIRESTORE_LEADERBOARD_DOCUMENT);
-      const snapshot = await docRef.get();
-      if (snapshot.exists) {
-        const data = snapshot.data() || {};
-        const fetchedAt = data.fetchedAt?.toMillis ? data.fetchedAt.toMillis() : data.fetchedAt || null;
-        const ageMs = fetchedAt ? Date.now() - fetchedAt : null;
-        if (!ageMs || ageMs <= LEADERBOARD_FIRESTORE_TTL_MS) {
-          return {
-            periods: data.periods || {},
-            labels: data.labels || {},
-            defaultPeriod: data.defaultPeriod || LEADERBOARD_DEFAULT_PERIOD,
-            fetchedAt,
-            source: 'firestore'
-          };
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to read leaderboard snapshot from Firestore', error);
-    }
-  }
+
+  // Always fetch live leaderboard data from Polymarket API, ignore Firestore
 
   const periods = {};
   const labels = {};
