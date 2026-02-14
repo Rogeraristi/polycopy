@@ -653,8 +653,19 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
           },
           body: JSON.stringify({ query })
         });
-        if (!response.ok) throw new Error(`GraphQL request failed: ${response.status}`);
-        const data = await response.json();
+        let data = null;
+        let text = null;
+        try {
+          text = await response.text();
+          data = JSON.parse(text);
+        } catch (parseErr) {
+          console.error(`Polymarket API response not JSON for period ${key}:`, text);
+          throw parseErr;
+        }
+        if (!response.ok || data?.errors) {
+          console.error(`Polymarket GraphQL error for period ${key}:`, data?.errors || response.status, text);
+          throw new Error(`GraphQL request failed: ${response.status}`);
+        }
         const entries = Array.isArray(data?.data?.leaderboard)
           ? data.data.leaderboard.map((entry, index) => ({
               address: entry.address?.toLowerCase() || '',
