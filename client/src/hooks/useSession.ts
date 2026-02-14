@@ -40,11 +40,12 @@ export function useSession(): UseSessionResult {
   const [isActionPending, setIsActionPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const API_BASE = import.meta.env.VITE_API_BASE_URL;
   const refresh = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/session', {
+      const response = await fetch(`${API_BASE}/api/session`, {
         credentials: 'include'
       });
       if (!response.ok) {
@@ -67,14 +68,14 @@ export function useSession(): UseSessionResult {
     const hash = window.location.hash || '';
     const redirectTarget = `${path}${query}${hash}` || '/';
     const encodedRedirect = encodeURIComponent(redirectTarget);
-    window.location.href = `/api/auth/google?redirect=${encodedRedirect}`;
-  }, []);
+    window.location.href = `${API_BASE}/api/auth/google?redirect=${encodedRedirect}`;
+  }, [API_BASE]);
 
   const logout = useCallback(async () => {
     setIsActionPending(true);
     setError(null);
     try {
-      const response = await fetch('/api/logout', {
+      const response = await fetch(`${API_BASE}/api/logout`, {
         method: 'POST',
         credentials: 'include'
       });
