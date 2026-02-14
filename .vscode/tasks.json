@@ -1,0 +1,12 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Vercel dev server",
+			"type": "shell",
+			"command": "npx vercel dev",
+			"args": [],
+			"isBackground": false
+		}
+	]
+}
