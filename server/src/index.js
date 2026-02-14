@@ -636,42 +636,48 @@ async function fetchFallbackLeaderboard(limit = LEADERBOARD_LIMIT) {
 
 async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
 
-  // Always fetch live leaderboard data from Polymarket API, ignore Firestore
-
+  // Fetch leaderboard data from Polymarket GraphQL API only
   const periods = {};
   const labels = {};
-  let source = 'scrape';
+  let source = 'graphql';
 
-  const results = await Promise.all(
+  await Promise.all(
     Object.entries(LEADERBOARD_PERIODS).map(async ([key, config]) => {
       try {
-        const entries = await fetchLeaderboardFromPath(config.path, limit);
-        return { key, config, entries };
+        const query = `query { leaderboard(period: \"${key}\", limit: ${limit}) { address profit volume rank trades name } }`;
+        const response = await fetch('https://gamma-api.polymarket.com/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'User-Agent': 'polycopy/1.0 (+https://polymarket.com)'
+          },
+          body: JSON.stringify({ query })
+        });
+        if (!response.ok) throw new Error(`GraphQL request failed: ${response.status}`);
+        const data = await response.json();
+        const entries = Array.isArray(data?.data?.leaderboard)
+          ? data.data.leaderboard.map((entry, index) => ({
+              address: entry.address?.toLowerCase() || '',
+              displayName: entry.name || (entry.address?.length > 10 ? `${entry.address.slice(0, 6)}…${entry.address.slice(-4)}` : entry.address),
+              rank: Number.isFinite(Number(entry.rank)) ? Number(entry.rank) : index + 1,
+              pnl: typeof entry.profit === 'number' ? entry.profit : null,
+              volume: typeof entry.volume === 'number' ? entry.volume : null,
+              trades: typeof entry.trades === 'number' ? entry.trades : null,
+              roi: null // Not provided by API
+            }))
+          : [];
+        if (entries.length > 0) {
+          periods[key] = entries;
+          labels[key] = config.label;
+        }
       } catch (error) {
-        console.warn(`Failed to fetch leaderboard period ${key}`, error instanceof Error ? error.message : error);
-        return { key, config, entries: [] };
+        console.warn(`Failed to fetch leaderboard period ${key} (GraphQL)`, error instanceof Error ? error.message : error);
       }
     })
   );
 
-  results.forEach(({ key, config, entries }) => {
-    if (Array.isArray(entries) && entries.length > 0) {
-      periods[key] = entries;
-      labels[key] = config.label;
-    }
-  });
-
   if (Object.keys(periods).length === 0) {
-    const fallback = await fetchFallbackLeaderboard(limit);
-    if (fallback.length > 0) {
-      periods[LEADERBOARD_DEFAULT_PERIOD] = fallback;
-      labels[LEADERBOARD_DEFAULT_PERIOD] = LEADERBOARD_PERIODS[LEADERBOARD_DEFAULT_PERIOD]?.label || 'Top Traders';
-      source = 'fallback';
-    }
-  }
-
-  if (Object.keys(periods).length === 0) {
-    throw new Error('No leaderboard data available from Polymarket');
+    throw new Error('No leaderboard data available from Polymarket GraphQL API');
   }
 
   const orderedKeys = Object.keys(LEADERBOARD_PERIODS).filter((key) => Array.isArray(periods[key]) && periods[key].length);
