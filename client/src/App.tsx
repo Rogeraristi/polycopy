@@ -74,7 +74,8 @@ export default function App() {
     setIsLeaderboardLoading(true);
     setLeaderboardError(null);
 
-    fetch('/api/leaderboard', { signal: controller.signal, credentials: 'include' })
+    const API_BASE = import.meta.env.VITE_API_BASE_URL;
+    fetch(`${API_BASE}/api/leaderboard`, { signal: controller.signal, credentials: 'include' })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Failed to load leaderboard (${res.status})`))))
       .then((data) => {
         if (!isActive) return;
@@ -187,7 +188,8 @@ export default function App() {
       setCopyError(null);
       try {
         const multiplier = sizeMultiplier > 0 ? sizeMultiplier : 1;
-        const response = await fetch('/api/copy-trade', {
+        const API_BASE = import.meta.env.VITE_API_BASE_URL;
+        const response = await fetch(`${API_BASE}/api/copy-trade`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
