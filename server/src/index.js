@@ -3,11 +3,6 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import express from 'express';
 // ...existing code...
-const app = express();
-// Redirect root URL to frontend homepage (must be after app is initialized)
-app.get('/', (req, res) => {
-  res.redirect(301, PRIMARY_CLIENT_ORIGIN);
-});
 import cors from 'cors';
 import session from 'express-session';
 import passport from 'passport';
