@@ -68,6 +68,7 @@ export function useSession(): UseSessionResult {
     const hash = window.location.hash || '';
     const redirectTarget = `${path}${query}${hash}` || '/';
     const encodedRedirect = encodeURIComponent(redirectTarget);
+    // Always use ?redirect= as a query parameter
     window.location.href = `${API_BASE}/api/auth/google?redirect=${encodedRedirect}`;
   }, [API_BASE]);
 
