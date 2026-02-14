@@ -776,11 +776,21 @@ function normaliseTraderSearchResults(payload, limit = 8) {
         extraStats.allTimeProfit
       );
 
-      const resolvedVolume =
 
-          extraStats.roiAllTime,
-          extraStats.allTimeRoi
-        );
+      const resolvedVolume = pickFirstNumber(
+        entry.volume,
+        entry.totalVolume,
+        entry.total_volume,
+        entry.notional,
+        metrics.volume,
+        metrics.totalVolume,
+        metrics.total_volume,
+        metrics.notional,
+        extraStats.volume,
+        extraStats.totalVolume,
+        extraStats.total_volume,
+        extraStats.notional
+      );
 
       results.push({
         address: normalisedAddress,
