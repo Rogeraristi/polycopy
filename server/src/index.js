@@ -639,12 +639,17 @@ async function fetchFallbackLeaderboard(limit = LEADERBOARD_LIMIT) {
   return [];
 }
 
-async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
 
-  // Fetch leaderboard data from Polymarket GraphQL API only
+async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
+  // Fetch leaderboard data from Polymarket GraphQL API with API key
   const periods = {};
   const labels = {};
   let source = 'graphql';
+
+  const POLYMARKET_API_KEY = process.env.POLYMARKET_API_KEY;
+  if (!POLYMARKET_API_KEY) {
+    throw new Error('POLYMARKET_API_KEY is not set in environment variables');
+  }
 
   await Promise.all(
     Object.entries(LEADERBOARD_PERIODS).map(async ([key, config]) => {
@@ -654,7 +659,8 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'polycopy/1.0 (+https://polymarket.com)'
+            'User-Agent': 'polycopy/1.0 (+https://polymarket.com)',
+            'X-API-Key': POLYMARKET_API_KEY
           },
           body: JSON.stringify({ query })
         });
