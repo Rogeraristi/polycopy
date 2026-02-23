@@ -256,10 +256,16 @@ function ensureGoogleConfigured(req, res, next) {
 }
 
 function resolveSessionRedirect(req) {
-  const redirectPath = req.session?.oauthRedirect;
-  if (redirectPath && typeof redirectPath === 'string' && redirectPath.startsWith('/') && !redirectPath.startsWith('//')) {
-    delete req.session.oauthRedirect;
-    return `${PRIMARY_CLIENT_ORIGIN.replace(/\/$/, '')}${redirectPath}`;
+  let redirectPath = req.session?.oauthRedirect;
+  // Safety: clear any legacy or malformed redirect
+  if (redirectPath && typeof redirectPath === 'string') {
+    if (redirectPath.startsWith('/') && !redirectPath.startsWith('//')) {
+      delete req.session.oauthRedirect;
+      return `${PRIMARY_CLIENT_ORIGIN.replace(/\/$/, '')}${redirectPath}`;
+    } else {
+      // Remove any invalid or legacy value
+      delete req.session.oauthRedirect;
+    }
   }
   return AUTH_SUCCESS_REDIRECT;
 }
