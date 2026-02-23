@@ -4,13 +4,9 @@ import dotenv from 'dotenv';
 import express from 'express';
 // ...existing code...
 import cors from 'cors';
-import session from 'express-session';
-import passport from 'passport';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import fetch from 'node-fetch';
 import { WebSocketServer } from 'ws';
 import http from 'http';
-import { initialiseFirebase, getFirestore, getFirebaseStatus, firebaseFieldValue } from './firebase.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,20 +80,7 @@ const SERVER_BASE_URL =
   `http://localhost:${PORT}`;
 const NORMALISED_SERVER_BASE_URL = SERVER_BASE_URL.replace(/\/$/, '');
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-const GOOGLE_AUTH_ENABLED = Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
-const GOOGLE_CALLBACK_URL =
-  process.env.GOOGLE_CALLBACK_URL || `${NORMALISED_SERVER_BASE_URL}/api/auth/google/callback`;
 
-const AUTH_SUCCESS_REDIRECT =
-  process.env.AUTH_SUCCESS_REDIRECT ||
-  process.env.CLIENT_SUCCESS_REDIRECT ||
-  `${PRIMARY_CLIENT_ORIGIN.replace(/\/$/, '')}/`;
-const AUTH_FAILURE_REDIRECT =
-  process.env.AUTH_FAILURE_REDIRECT || `${PRIMARY_CLIENT_ORIGIN.replace(/\/$/, '')}/?authError=oauth_failed`;
-const FIREBASE_USER_COLLECTION =
-  process.env.FIREBASE_USER_COLLECTION || process.env.FIREBASE_SETTINGS_COLLECTION || 'users';
 
 const LEADERBOARD_PERIODS = {
   today: { path: '/leaderboard/overall/today/profit', label: 'Today' },
@@ -122,17 +105,10 @@ const leaderboardCache = {
   snapshot: null
 };
 
-const FIRESTORE_LEADERBOARD_COLLECTION =
-  process.env.FIREBASE_LEADERBOARD_COLLECTION || process.env.LEADERBOARD_COLLECTION || 'leaderboardSnapshots';
-const FIRESTORE_LEADERBOARD_DOCUMENT = process.env.FIREBASE_LEADERBOARD_DOCUMENT || 'latest';
-const FIRESTORE_LEADERBOARD_HISTORY_COLLECTION =
-  process.env.FIREBASE_LEADERBOARD_HISTORY_COLLECTION || 'leaderboardSnapshotsHistory';
 
 const app = express();
 
-const { configured: firebaseConfigured } = initialiseFirebase();
 
-const firestore = getFirestore();
 
 if (IS_PRODUCTION) {
   app.set('trust proxy', 1);
@@ -156,23 +132,7 @@ app.use(
   })
 );
 
-app.use(
-  session({
-    name: SESSION_COOKIE_NAME,
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      maxAge: SESSION_MAX_AGE_MS,
-      sameSite: IS_PRODUCTION ? 'none' : 'lax',
-      secure: IS_PRODUCTION
-    }
-  })
-);
-
-app.use(passport.initialize());
-app.use(passport.session());
+// Removed session and passport middleware for public API
 app.use(express.json());
 
 const GOOGLE_SCOPES = (process.env.GOOGLE_AUTH_SCOPES || 'profile,email')
@@ -273,197 +233,9 @@ function clearSessionCookie(res) {
   });
 }
 
-function normaliseTimestamp(value) {
-  if (!value) return null;
-  if (typeof value === 'string') {
-    return value;
-  }
-  if (typeof value === 'number') {
-    return new Date(value).toISOString();
-  }
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  if (value?.toDate && typeof value.toDate === 'function') {
-    return value.toDate().toISOString();
-  }
-  return null;
-}
 
-async function upsertUserProfile(user) {
-  if (!user || typeof user !== 'object' || !user.id) {
-    return;
-  }
-  const firestore = getFirestore();
-  if (!firestore) {
-    return;
-  }
 
-  try {
-    const docRef = firestore.collection(FIREBASE_USER_COLLECTION).doc(user.id);
-    const snapshot = await docRef.get();
-    const payload = {
-      profile: {
-        id: user.id,
-        name: user.name || null,
-        email: user.email || null,
-        avatar: user.avatar || null,
-        provider: user.provider || 'google'
-      },
-      lastLoginAt: firebaseFieldValue.serverTimestamp(),
-      updatedAt: firebaseFieldValue.serverTimestamp(),
-      loginCount: firebaseFieldValue.increment(1)
-    };
 
-    if (!snapshot.exists) {
-      payload.createdAt = firebaseFieldValue.serverTimestamp();
-    }
-
-    await docRef.set(payload, { merge: true });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('Failed to upsert user profile', message);
-  }
-}
-
-function ensureAuthenticated(req, res, next) {
-  if (!req.user) {
-    res.status(401).json({ error: 'Authentication required' });
-    return;
-  }
-  next();
-}
-
-function ensureFirebaseReady(req, res, next) {
-  const firestore = getFirestore();
-  if (!firestore) {
-    res.status(503).json({
-      error: 'Firebase is not configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY.'
-    });
-    return;
-  }
-  req.firestore = firestore;
-  next();
-}
-
-app.get('/api/session', (req, res) => {
-  const user = req.user || null;
-  res.json({
-    authenticated: Boolean(user),
-    user
-  });
-});
-
-app.post('/api/logout', (req, res, next) => {
-  const finish = () => {
-    clearSessionCookie(res);
-    res.json({ success: true });
-  };
-
-  if (typeof req.logout === 'function') {
-    req.logout((logoutError) => {
-      if (logoutError) {
-        next(logoutError);
-        return;
-      }
-      if (req.session) {
-        req.session.destroy(() => {
-          finish();
-        });
-      } else {
-        finish();
-      }
-    });
-  } else if (req.session) {
-    req.session.destroy(() => {
-      finish();
-    });
-  } else {
-    finish();
-  }
-});
-
-app.get('/api/auth/google', ensureGoogleConfigured, (req, res, next) => {
-  const { redirect } = req.query || {};
-  if (typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')) {
-    req.session.oauthRedirect = redirect;
-  }
-
-  passport.authenticate('google', {
-    scope: GOOGLE_SCOPES,
-    prompt: GOOGLE_PROMPT,
-    session: true,
-    state: true
-  })(req, res, next);
-});
-
-app.get(
-  '/api/auth/google/callback',
-  ensureGoogleConfigured,
-  passport.authenticate('google', {
-    failureRedirect: AUTH_FAILURE_REDIRECT,
-    session: true
-  }),
-  async (req, res) => {
-    await upsertUserProfile(req.user);
-    const redirectTarget = resolveSessionRedirect(req);
-    res.redirect(redirectTarget);
-  }
-);
-
-app.get('/api/firebase/status', (_req, res) => {
-  res.json(getFirebaseStatus());
-});
-
-app.get('/api/user/settings', ensureAuthenticated, ensureFirebaseReady, async (req, res) => {
-  try {
-    const collection = req.firestore.collection(FIREBASE_USER_COLLECTION);
-    const docRef = collection.doc(req.user.id);
-    const snapshot = await docRef.get();
-    if (!snapshot.exists) {
-      res.json({ settings: null, updatedAt: null });
-      return;
-    }
-    const data = snapshot.data() || {};
-    res.json({
-      settings: data.settings || null,
-      updatedAt: normaliseTimestamp(data.updatedAt)
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('Failed to read user settings', message);
-    res.status(500).json({ error: 'Failed to fetch user settings' });
-  }
-});
-
-app.post('/api/user/settings', ensureAuthenticated, ensureFirebaseReady, async (req, res) => {
-  const { settings } = req.body || {};
-  if (!settings || typeof settings !== 'object') {
-    res.status(400).json({ error: 'settings object is required' });
-    return;
-  }
-
-  try {
-    const collection = req.firestore.collection(FIREBASE_USER_COLLECTION);
-    const docRef = collection.doc(req.user.id);
-    const payload = {
-      settings,
-      updatedAt: new Date().toISOString(),
-      user: {
-        id: req.user.id,
-        name: req.user.name,
-        email: req.user.email,
-        provider: req.user.provider
-      }
-    };
-    await docRef.set(payload, { merge: true });
-    res.json({ settings: payload.settings, updatedAt: payload.updatedAt });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error('Failed to persist user settings', message);
-    res.status(500).json({ error: 'Failed to save user settings' });
-  }
-});
 
 function normaliseTradesPayload(payload) {
   if (!payload) return [];
