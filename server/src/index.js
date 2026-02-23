@@ -543,6 +543,7 @@ function normaliseLeaderboardEntries(payload, fallbackLimit) {
 
   return data
     .map((entry, index) => {
+      // Map Apify fields to expected fields
       const address =
         entry?.address ||
         entry?.account ||
@@ -566,6 +567,7 @@ function normaliseLeaderboardEntries(payload, fallbackLimit) {
         toFiniteNumber(entry?.profit);
       const volume =
         toFiniteNumber(entry?.volume) ??
+        toFiniteNumber(entry?.vol) ?? // Apify uses 'vol'
         toFiniteNumber(entry?.totalVolume) ??
         toFiniteNumber(entry?.total_volume) ??
         toFiniteNumber(entry?.notional);
@@ -580,9 +582,12 @@ function normaliseLeaderboardEntries(payload, fallbackLimit) {
         toFiniteNumber(entry?.trades) ??
         toFiniteNumber(entry?.tradeCount) ??
         toFiniteNumber(entry?.trade_count) ??
-        toFiniteNumber(entry?.fills);
+        toFiniteNumber(entry?.fills) ??
+        null; // Apify does not provide trades, so default to null
 
       const displayName =
+        entry?.displayName ||
+        entry?.userName || // Apify uses 'userName'
         entry?.name ||
         entry?.username ||
         entry?.handle ||

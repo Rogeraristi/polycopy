@@ -1,8 +1,46 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ethers } from 'ethers';
+// Dummy Polymarket contract address and ABI for demonstration
+const POLYMARKET_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // TODO: Replace with real address
+const POLYMARKET_ABI = [
+  // Replace with actual ABI
+  // Example:
+  // "function trade(uint256 marketId, string outcome, uint256 price, uint256 size, string side) public payable"
+];
+  const [txStatus, setTxStatus] = useState<string | null>(null);
+  // Function to submit the prepared order to Polymarket via MetaMask
+  const handleSubmitOrder = useCallback(async () => {
+    if (!copyResult || !window.ethereum) {
+      setTxStatus('MetaMask not available or no order to submit.');
+      return;
+    }
+    setTxStatus('Awaiting wallet confirmation...');
+    try {
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      // TODO: Replace with actual contract and method
+      const contract = new ethers.Contract(POLYMARKET_CONTRACT_ADDRESS, POLYMARKET_ABI, signer);
+      // Example call - update with real method and params
+      // const tx = await contract.trade(
+      //   copyResult.order.marketId,
+      //   copyResult.order.outcome,
+      //   ethers.utils.parseUnits(String(copyResult.order.price), 6),
+      //   ethers.utils.parseUnits(String(copyResult.order.size), 6),
+      //   copyResult.order.side
+      // );
+      // await tx.wait();
+      // For demo, just simulate success
+      setTimeout(() => setTxStatus('Order submitted! (Demo: replace with real contract call)'), 1500);
+    } catch (err) {
+      setTxStatus('Transaction failed: ' + (err instanceof Error ? err.message : String(err)));
+    }
+  }, [copyResult]);
 import { HeaderBar } from './components/HeaderBar';
 import { LatencyBadge } from './components/LatencyBadge';
 import { Leaderboard, LeaderboardEntry } from './components/Leaderboard';
 import { TradeList } from './components/TradeList';
+import { TraderDashboard } from './components/TraderDashboard';
 import { TraderSearch } from './components/TraderSearch';
 import { useFirebaseAnalytics } from './hooks/useFirebaseAnalytics';
 import { useTraderSearch } from './hooks/useTraderSearch';
@@ -308,6 +346,11 @@ export default function App() {
           </div>
         </section>
 
+        {/* Trader Dashboard visualization */}
+        {selectedAddress && (
+          <TraderDashboard address={selectedAddress} />
+        )}
+
         <Leaderboard
           entries={activeLeaderboardEntries}
           isLoading={isLeaderboardLoading}
@@ -480,6 +523,16 @@ export default function App() {
                     </dd>
                   </div>
                 </dl>
+                <button
+                  className="mt-4 rounded-lg bg-primary px-4 py-2 font-semibold text-white hover:bg-primary/80"
+                  onClick={handleSubmitOrder}
+                  disabled={!!txStatus && txStatus.startsWith('Awaiting')}
+                >
+                  Submit order with MetaMask
+                </button>
+                {txStatus && (
+                  <div className="mt-2 text-xs text-emerald-200">{txStatus}</div>
+                )}
               </div>
             )}
           </div>
