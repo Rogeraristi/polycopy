@@ -641,77 +641,36 @@ async function fetchFallbackLeaderboard(limit = LEADERBOARD_LIMIT) {
 
 
 async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
-  // Fetch leaderboard data from Polymarket GraphQL API with API key
-  const periods = {};
-  const labels = {};
-  let source = 'graphql';
-
-  const POLYMARKET_API_KEY = process.env.POLYMARKET_API_KEY;
-  if (!POLYMARKET_API_KEY) {
-    throw new Error('POLYMARKET_API_KEY is not set in environment variables');
+  // Fetch leaderboard data from Apify Polymarket Leaderboard Scraper
+  const APIFY_LEADERBOARD_URL = process.env.APIFY_LEADERBOARD_URL ||
+    'https://api.apify.com/v2/datasets/8QwKQwKQwKQwKQwKQ/items?format=json&clean=true';
+  // You can replace the above with your own Apify dataset URL
+  let periods = {};
+  let labels = {};
+  let source = 'apify';
+  let fetchedAt = Date.now();
+  let defaultPeriod = LEADERBOARD_DEFAULT_PERIOD;
+  try {
+    const response = await fetch(APIFY_LEADERBOARD_URL);
+    if (!response.ok) {
+      throw new Error(`Apify leaderboard fetch failed: ${response.status}`);
+    }
+    const apifyData = await response.json();
+    // Apify returns a flat array, so we use only one period (weekly/all)
+    const entries = normaliseLeaderboardEntries(apifyData, limit);
+    periods[defaultPeriod] = entries;
+    labels[defaultPeriod] = 'Leaderboard';
+    fetchedAt = Date.now();
+  } catch (error) {
+    console.error('Failed to fetch leaderboard from Apify', error);
+    periods = {};
+    labels = {};
   }
-
-  await Promise.all(
-    Object.entries(LEADERBOARD_PERIODS).map(async ([key, config]) => {
-      try {
-        const query = `query { leaderboard(period: \"${key}\", limit: ${limit}) { address profit volume rank trades name } }`;
-        const response = await fetch('https://gamma-api.polymarket.com/query', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'User-Agent': 'polycopy/1.0 (+https://polymarket.com)',
-            'X-API-Key': POLYMARKET_API_KEY
-          },
-          body: JSON.stringify({ query })
-        });
-        let data = null;
-        let text = null;
-        try {
-          text = await response.text();
-          data = JSON.parse(text);
-        } catch (parseErr) {
-          console.error(`Polymarket API response not JSON for period ${key}:`, text);
-          throw parseErr;
-        }
-        if (!response.ok || data?.errors) {
-          console.error(`Polymarket GraphQL error for period ${key}:`, data?.errors || response.status, text);
-          throw new Error(`GraphQL request failed: ${response.status}`);
-        }
-        const entries = Array.isArray(data?.data?.leaderboard)
-          ? data.data.leaderboard.map((entry, index) => ({
-              address: entry.address?.toLowerCase() || '',
-              displayName: entry.name || (entry.address?.length > 10 ? `${entry.address.slice(0, 6)}…${entry.address.slice(-4)}` : entry.address),
-              rank: Number.isFinite(Number(entry.rank)) ? Number(entry.rank) : index + 1,
-              pnl: typeof entry.profit === 'number' ? entry.profit : null,
-              volume: typeof entry.volume === 'number' ? entry.volume : null,
-              trades: typeof entry.trades === 'number' ? entry.trades : null,
-              roi: null // Not provided by API
-            }))
-          : [];
-        if (entries.length > 0) {
-          periods[key] = entries;
-          labels[key] = config.label;
-        }
-      } catch (error) {
-        console.warn(`Failed to fetch leaderboard period ${key} (GraphQL)`, error instanceof Error ? error.message : error);
-      }
-    })
-  );
-
-  if (Object.keys(periods).length === 0) {
-    throw new Error('No leaderboard data available from Polymarket GraphQL API');
-  }
-
-  const orderedKeys = Object.keys(LEADERBOARD_PERIODS).filter((key) => Array.isArray(periods[key]) && periods[key].length);
-  const availableKeys = orderedKeys.length ? orderedKeys : Object.keys(periods);
-  const defaultPeriod =
-    availableKeys.find((key) => key === LEADERBOARD_DEFAULT_PERIOD) || availableKeys[0] || null;
-
   return {
     periods,
     labels,
     defaultPeriod,
-    fetchedAt: Date.now(),
+    fetchedAt,
     source
   };
 }
