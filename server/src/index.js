@@ -1,3 +1,6 @@
+// ...existing imports and setup...
+const app = express();
+
 // Add a simple message for the root route
 app.get('/', (req, res) => {
   res.send('Polycopy API server: No frontend is served from this endpoint.');
