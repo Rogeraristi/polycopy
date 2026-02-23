@@ -645,7 +645,7 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
     Object.entries(LEADERBOARD_PERIODS).map(async ([key, config]) => {
       try {
         const query = `query { leaderboard(period: \"${key}\", limit: ${limit}) { address profit volume rank trades name } }`;
-        const response = await fetch('https://gamma-api.polymarket.com/', {
+        const response = await fetch('https://gamma-api.polymarket.com/query', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
