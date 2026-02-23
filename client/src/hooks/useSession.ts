@@ -40,7 +40,10 @@ export function useSession(): UseSessionResult {
   const [isActionPending, setIsActionPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_BASE = import.meta.env.VITE_API_BASE_URL;
+  // Use the full backend URL for API_BASE if running in production (Vercel), otherwise use local proxy
+  const API_BASE = import.meta.env.VITE_API_BASE_URL?.startsWith('http')
+    ? import.meta.env.VITE_API_BASE_URL
+    : 'https://polycopy.onrender.com';
   console.log('VITE_API_BASE_URL:', API_BASE);
   const refresh = useCallback(async () => {
     setIsLoading(true);
@@ -64,13 +67,13 @@ export function useSession(): UseSessionResult {
   }, []);
 
   const login = useCallback(() => {
+    // Always use the backend URL directly in production
     const path = window.location.pathname || '/';
     const query = window.location.search || '';
     const hash = window.location.hash || '';
     const redirectTarget = `${path}${query}${hash}` || '/';
     const encodedRedirect = encodeURIComponent(redirectTarget);
     const loginUrl = `${API_BASE}/api/auth/google?redirect=${encodedRedirect}`;
-    console.log('Login redirect:', loginUrl);
     window.location.href = loginUrl;
   }, [API_BASE]);
 

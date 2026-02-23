@@ -1,3 +1,7 @@
+// Add a simple message for the root route
+app.get('/', (req, res) => {
+  res.send('Polycopy API server: No frontend is served from this endpoint.');
+});
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
