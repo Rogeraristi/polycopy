@@ -7,7 +7,48 @@ const POLYMARKET_ABI = [
   // Example:
   // "function trade(uint256 marketId, string outcome, uint256 price, uint256 size, string side) public payable"
 ];
+import { HeaderBar } from './components/HeaderBar';
+import { LatencyBadge } from './components/LatencyBadge';
+import { Leaderboard, LeaderboardEntry } from './components/Leaderboard';
+import { TradeList } from './components/TradeList';
+import { TraderDashboard } from './components/TraderDashboard';
+import { TraderSearch } from './components/TraderSearch';
+import { useTraderSearch } from './hooks/useTraderSearch';
+import { useSession } from './hooks/useSession';
+import { useWalletConnection } from './hooks/useWalletConnection';
+import { useLiveTrades } from './hooks/useLiveTrades';
+import type { Trade } from './hooks/useLiveTrades';
+
+interface CopyTradeOrder {
+  marketId?: string;
+  outcome?: string;
+  price?: number;
+  size?: number;
+  side?: string;
+  copiedFrom?: string;
+  timestamp?: number;
+}
+
+interface CopyTradeResult {
+  order: CopyTradeOrder;
+  message?: string;
+  sourceTrade: Trade;
+}
+
+export default function App() {
+  const [inputAddress, setInputAddress] = useState('');
+  const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
+  const [leaderboardPeriods, setLeaderboardPeriods] = useState<Record<string, LeaderboardEntry[]>>({});
+  const [leaderboardLabels, setLeaderboardLabels] = useState<Record<string, string>>({});
+  const [activeLeaderboardPeriod, setActiveLeaderboardPeriod] = useState<string>('weekly');
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  const [sizeMultiplier, setSizeMultiplier] = useState<number>(1);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [copyResult, setCopyResult] = useState<CopyTradeResult | null>(null);
+  const [isCopying, setIsCopying] = useState(false);
   const [txStatus, setTxStatus] = useState<string | null>(null);
+
   // Function to submit the prepared order to Polymarket via MetaMask
   const handleSubmitOrder = useCallback(async () => {
     if (!copyResult || !window.ethereum) {
@@ -36,48 +77,6 @@ const POLYMARKET_ABI = [
       setTxStatus('Transaction failed: ' + (err instanceof Error ? err.message : String(err)));
     }
   }, [copyResult]);
-import { HeaderBar } from './components/HeaderBar';
-import { LatencyBadge } from './components/LatencyBadge';
-import { Leaderboard, LeaderboardEntry } from './components/Leaderboard';
-import { TradeList } from './components/TradeList';
-import { TraderDashboard } from './components/TraderDashboard';
-import { TraderSearch } from './components/TraderSearch';
-import { useFirebaseAnalytics } from './hooks/useFirebaseAnalytics';
-import { useTraderSearch } from './hooks/useTraderSearch';
-import { useSession } from './hooks/useSession';
-import { useWalletConnection } from './hooks/useWalletConnection';
-import { useLiveTrades } from './hooks/useLiveTrades';
-import type { Trade } from './hooks/useLiveTrades';
-
-interface CopyTradeOrder {
-  marketId?: string;
-  outcome?: string;
-  price?: number;
-  size?: number;
-  side?: string;
-  copiedFrom?: string;
-  timestamp?: number;
-}
-
-interface CopyTradeResult {
-  order: CopyTradeOrder;
-  message?: string;
-  sourceTrade: Trade;
-}
-
-export default function App() {
-  useFirebaseAnalytics();
-  const [inputAddress, setInputAddress] = useState('');
-  const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
-  const [leaderboardPeriods, setLeaderboardPeriods] = useState<Record<string, LeaderboardEntry[]>>({});
-  const [leaderboardLabels, setLeaderboardLabels] = useState<Record<string, string>>({});
-  const [activeLeaderboardPeriod, setActiveLeaderboardPeriod] = useState<string>('weekly');
-  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true);
-  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
-  const [sizeMultiplier, setSizeMultiplier] = useState<number>(1);
-  const [copyError, setCopyError] = useState<string | null>(null);
-  const [copyResult, setCopyResult] = useState<CopyTradeResult | null>(null);
-  const [isCopying, setIsCopying] = useState(false);
   const {
     user,
     isLoading: isSessionLoading,
