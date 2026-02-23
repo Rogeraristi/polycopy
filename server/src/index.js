@@ -1,15 +1,7 @@
-// ...existing imports and setup...
-const app = express();
-
-// Add a simple message for the root route
-app.get('/', (req, res) => {
-  res.send('Polycopy API server: No frontend is served from this endpoint.');
-});
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import express from 'express';
-// ...existing code...
 import cors from 'cors';
 import session from 'express-session';
 import passport from 'passport';
