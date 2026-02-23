@@ -66,16 +66,11 @@ export function useSession(): UseSessionResult {
     }
   }, []);
 
-  const login = useCallback(() => {
-    // Always use the backend URL directly in production
-    const path = window.location.pathname || '/';
-    const query = window.location.search || '';
-    const hash = window.location.hash || '';
-    const redirectTarget = `${path}${query}${hash}` || '/';
-    const encodedRedirect = encodeURIComponent(redirectTarget);
-    const loginUrl = `${API_BASE}/api/auth/google?redirect=${encodedRedirect}`;
-    window.location.href = loginUrl;
-  }, [API_BASE]);
+    const login = useCallback(() => {
+      // Always redirect to homepage after login to avoid malformed URLs
+      const loginUrl = `${API_BASE}/api/auth/google?redirect=%2F`;
+      window.location.href = loginUrl;
+    }, [API_BASE]);
 
   const logout = useCallback(async () => {
     setIsActionPending(true);
