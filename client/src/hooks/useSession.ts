@@ -49,7 +49,7 @@ export function useSession(): UseSessionResult {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/api/session`, {
+      const response = await fetch(`${API_BASE}/session`, {
         credentials: 'include'
       });
       if (!response.ok) {
@@ -68,7 +68,7 @@ export function useSession(): UseSessionResult {
 
     const login = useCallback(() => {
       // Always redirect to homepage after login to avoid malformed URLs
-      const loginUrl = `${API_BASE}/api/auth/google?redirect=%2F`;
+      const loginUrl = `${API_BASE}/auth/google?redirect=%2F`;
       window.location.href = loginUrl;
     }, [API_BASE]);
 
@@ -76,7 +76,7 @@ export function useSession(): UseSessionResult {
     setIsActionPending(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE}/api/logout`, {
+      const response = await fetch(`${API_BASE}/logout`, {
         method: 'POST',
         credentials: 'include'
       });

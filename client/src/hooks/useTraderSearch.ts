@@ -50,7 +50,7 @@ export function useTraderSearch(query: string, options: TraderSearchOptions = {}
       });
 
       const API_BASE = import.meta.env.VITE_API_BASE_URL;
-      fetch(`${API_BASE}/api/trader-search?${searchParams.toString()}`, {
+      fetch(`${API_BASE}/trader-search?${searchParams.toString()}`, {
         signal: controller.signal,
         credentials: 'include'
       })

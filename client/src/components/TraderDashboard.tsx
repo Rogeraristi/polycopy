@@ -33,7 +33,7 @@ export function TraderDashboard({ address }: { address: string }) {
       try {
         const API_BASE = (import.meta as any).env.VITE_API_BASE_URL;
         // Fetch trades
-        const tradesRes = await fetch(`${API_BASE}/api/users/${address}/trades`, {
+        const tradesRes = await fetch(`${API_BASE}/users/${address}/trades`, {
           signal: abort.signal,
           credentials: 'include',
         });
@@ -41,17 +41,17 @@ export function TraderDashboard({ address }: { address: string }) {
         if (!isCancelled) setTrades(Array.isArray(tradesData?.trades) ? tradesData.trades : []);
 
         // Fetch portfolio value
-        const portfolioRes = await fetch(`${API_BASE}/api/users/${address}/portfolio`, { signal: abort.signal, credentials: 'include' });
+        const portfolioRes = await fetch(`${API_BASE}/users/${address}/portfolio`, { signal: abort.signal, credentials: 'include' });
         const portfolioData = await portfolioRes.json();
         if (!isCancelled) setPortfolioValue(typeof portfolioData?.portfolioValue === 'number' ? portfolioData.portfolioValue : null);
 
         // Fetch PnL
-        const pnlRes = await fetch(`${API_BASE}/api/users/${address}/pnl`, { signal: abort.signal, credentials: 'include' });
+        const pnlRes = await fetch(`${API_BASE}/users/${address}/pnl`, { signal: abort.signal, credentials: 'include' });
         const pnlData = await pnlRes.json();
         if (!isCancelled) setPnl(typeof pnlData?.pnl === 'number' ? pnlData.pnl : null);
 
         // Fetch open orders
-        const ordersRes = await fetch(`${API_BASE}/api/users/${address}/open-orders`, { signal: abort.signal, credentials: 'include' });
+        const ordersRes = await fetch(`${API_BASE}/users/${address}/open-orders`, { signal: abort.signal, credentials: 'include' });
         const ordersData = await ordersRes.json();
         if (!isCancelled) setOpenOrders(Array.isArray(ordersData?.openOrders) ? ordersData.openOrders : []);
       } catch (err) {
