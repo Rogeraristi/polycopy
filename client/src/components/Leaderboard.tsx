@@ -73,6 +73,15 @@ function getAvatar(entry: LeaderboardEntry) {
   return `data:image/svg+xml;base64,${btoa(svg.replace(/\n\s+/g, ''))}`;
 }
 
+function getPolymarketProfileUrl(entry: LeaderboardEntry) {
+  const handle =
+    (typeof entry.username === 'string' && entry.username.trim()) ||
+    (typeof entry.pseudonym === 'string' && entry.pseudonym.trim()) ||
+    null;
+  if (!handle) return null;
+  return `https://polymarket.com/@${encodeURIComponent(handle.replace(/^@+/, ''))}`;
+}
+
 function PodiumCard({
   entry,
   onSelect,
@@ -86,36 +95,79 @@ function PodiumCard({
   emphasized?: boolean;
   compact?: boolean;
 }) {
+  // Podium color logic
+  let border = 'border-slate-700/70';
+  let bg = 'bg-slate-900/80';
+  let shadow = '';
+  let trophy = getTrophy(entry.rank);
+  let rankColor = 'text-slate-300';
+  let trophyBg = '';
+  if (entry.rank === 1) {
+    border = 'border-yellow-400/80';
+    bg = 'bg-gradient-to-b from-yellow-200/60 via-yellow-100/40 to-yellow-900/10';
+    shadow = 'shadow-xl shadow-yellow-400/40';
+    trophy = '🥇';
+    rankColor = 'text-yellow-400';
+    trophyBg = 'bg-[radial-gradient(circle,_rgba(255,215,0,0.18)_0%,_rgba(255,215,0,0)_70%)]';
+  } else if (entry.rank === 2) {
+    border = 'border-gray-300/80';
+    bg = 'bg-gradient-to-b from-gray-200/60 via-gray-100/40 to-gray-900/10';
+    shadow = 'shadow-xl shadow-gray-300/40';
+    trophy = '🥈';
+    rankColor = 'text-gray-300';
+    trophyBg = 'bg-[radial-gradient(circle,_rgba(192,192,192,0.18)_0%,_rgba(192,192,192,0)_70%)]';
+  } else if (entry.rank === 3) {
+    border = 'border-amber-700/80';
+    bg = 'bg-gradient-to-b from-amber-300/60 via-amber-100/40 to-amber-900/10';
+    shadow = 'shadow-xl shadow-amber-700/40';
+    trophy = '🥉';
+    rankColor = 'text-amber-400';
+    trophyBg = 'bg-[radial-gradient(circle,_rgba(205,127,50,0.18)_0%,_rgba(205,127,50,0)_70%)]';
+  }
   return (
     <button
       type="button"
       onClick={() => onSelect(entry.address, entry)}
       onMouseEnter={() => onPrefetch?.(entry.address)}
       onFocus={() => onPrefetch?.(entry.address)}
-      className={`w-full rounded-2xl border p-4 text-left transition ${
-        emphasized
-          ? 'border-amber-300/50 bg-gradient-to-b from-amber-500/15 to-slate-900/80 shadow-lg shadow-amber-500/20'
-          : compact
-          ? 'border-slate-700/70 bg-slate-900/80 hover:border-slate-500'
-          : 'border-slate-700/70 bg-slate-900/70 hover:border-slate-500'
-      }`}
+      className={`relative w-full rounded-2xl border p-4 text-left transition ${border} ${bg} ${shadow} overflow-hidden`}
     >
+      {/* Large faded trophy background */}
+      {(entry.rank === 1 || entry.rank === 2 || entry.rank === 3) && (
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute left-1/2 top-1/2 -z-10 -translate-x-1/2 -translate-y-1/2 select-none text-[7rem] opacity-20 ${trophyBg}`}
+        >
+          {trophy}
+        </span>
+      )}
       <div className="flex items-center justify-between">
-        <span className={`${emphasized ? 'text-3xl' : 'text-2xl'}`}>{getTrophy(entry.rank)}</span>
-        <span className={`text-xs ${emphasized ? 'text-amber-200' : 'text-slate-300'}`}>Rank #{entry.rank}</span>
+        <span className={`${emphasized ? 'text-3xl' : 'text-2xl'}`}>{trophy}</span>
+        <span className={`text-xs ${rankColor}`}>Rank #{entry.rank}</span>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <img
           src={getAvatar(entry)}
           alt={`${entry.displayName} avatar`}
-          className={`${emphasized ? 'h-12 w-12' : 'h-10 w-10'} rounded-full object-cover`}
+          className={`${emphasized ? 'h-14 w-14' : 'h-12 w-12'} rounded-full object-cover ring-2 ring-white/40`}
           loading="lazy"
         />
         <div className="min-w-0">
-          <p className={`${emphasized ? 'text-base' : 'text-sm'} truncate font-semibold text-white`}>{entry.displayName}</p>
+          <p className={`${emphasized ? 'text-lg' : 'text-base'} truncate font-semibold text-white`}>{entry.displayName}</p>
           <p className="truncate text-xs text-slate-400">{entry.address}</p>
         </div>
       </div>
+      {getPolymarketProfileUrl(entry) && (
+        <a
+          href={getPolymarketProfileUrl(entry)!}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(event) => event.stopPropagation()}
+          className="mt-2 inline-flex text-xs font-semibold text-blue-300 hover:text-blue-200 hover:underline"
+        >
+          View on Polymarket
+        </a>
+      )}
       <dl className="mt-4 grid grid-cols-2 gap-2 text-xs">
         <div>
           <dt className="text-slate-400">ROI</dt>
@@ -324,7 +376,20 @@ export function Leaderboard({
                           />
                           <div>
                             <p className="font-medium text-slate-100">{trader.displayName}</p>
-                            <p className="text-xs text-slate-500">{trader.address}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-slate-500">{trader.address}</p>
+                              {getPolymarketProfileUrl(trader) && (
+                                <a
+                                  href={getPolymarketProfileUrl(trader)!}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(event) => event.stopPropagation()}
+                                  className="text-[11px] font-semibold text-blue-300 hover:text-blue-200 hover:underline"
+                                >
+                                  Polymarket
+                                </a>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>

@@ -2028,6 +2028,74 @@ function resolveBestTraderMatch(query, traders) {
   return scored[0].entry;
 }
 
+function resolveTraderByAddress(address, traders) {
+  const normalizedAddress = String(address || '').toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalizedAddress) || !Array.isArray(traders)) {
+    return null;
+  }
+
+  const exact = traders.find(
+    (entry) => entry && typeof entry.address === 'string' && entry.address.toLowerCase() === normalizedAddress
+  );
+  if (exact) return exact;
+
+  const prefixed = normalizedAddress.slice(0, 6);
+  const suffixed = normalizedAddress.slice(-4);
+  return (
+    traders.find((entry) => {
+      const text = `${entry?.displayName || ''} ${entry?.username || ''} ${entry?.pseudonym || ''}`.toLowerCase();
+      return text.includes(prefixed) && text.includes(suffixed);
+    }) || null
+  );
+}
+
+function buildPolymarketProfileUrl(match) {
+  if (!match || typeof match !== 'object') return null;
+  const username = normaliseHandle(match.username);
+  if (username) {
+    return `https://polymarket.com/@${encodeURIComponent(username)}`;
+  }
+  const pseudonym = normaliseHandle(match.pseudonym);
+  if (pseudonym) {
+    return `https://polymarket.com/@${encodeURIComponent(pseudonym)}`;
+  }
+  return null;
+}
+
+async function fetchTraderProfileSummary(address) {
+  const normalized = String(address || '').trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalized)) {
+    return null;
+  }
+
+  try {
+    const { traders } = await searchTraders(normalized, 12);
+    const match = resolveTraderByAddress(normalized, traders);
+    if (!match) return null;
+
+    return {
+      address: normalized,
+      displayName:
+        typeof match.displayName === 'string' && match.displayName.trim()
+          ? match.displayName
+          : `${normalized.slice(0, 6)}…${normalized.slice(-4)}`,
+      username: typeof match.username === 'string' ? match.username : null,
+      pseudonym: typeof match.pseudonym === 'string' ? match.pseudonym : null,
+      polymarketUrl: buildPolymarketProfileUrl(match),
+      avatarUrl: typeof match.avatarUrl === 'string' ? match.avatarUrl : null,
+      rank: Number.isFinite(Number(match.rank)) ? Number(match.rank) : null,
+      roi: toFiniteNumber(match.roi),
+      pnl: toFiniteNumber(match.pnl),
+      volume: toFiniteNumber(match.volume),
+      trades: toFiniteNumber(match.trades)
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Failed to resolve profile summary for ${normalized}`, message);
+    return null;
+  }
+}
+
 app.get('/api/markets', async (_req, res) => {
   const markets = await fetchMarkets();
   res.json({ markets });
@@ -2409,7 +2477,10 @@ app.get('/api/users/:address/overview', async (req, res) => {
     const period = typeof req.query?.period === 'string' ? req.query.period : 'all';
     const limit = Number.isFinite(Number(req.query?.limit)) ? Number(req.query.limit) : 150;
     const trades = await fetchUserTrades(address, { period, limit });
-    const [portfolioValue] = await Promise.all([fetchUserTotalPositionValue(address)]);
+    const [portfolioValue, profile] = await Promise.all([
+      fetchUserTotalPositionValue(address),
+      fetchTraderProfileSummary(address)
+    ]);
     const snapshot = computePortfolioSnapshotFromTrades(trades);
     const pnlData = computePnlFromTrades(trades);
     const openOrders = snapshot.openPositions.map((position) => ({
@@ -2423,6 +2494,7 @@ app.get('/api/users/:address/overview', async (req, res) => {
     res.json({
       address: address.toLowerCase(),
       period,
+      profile,
       trades,
       pnl: pnlData,
       portfolio: {

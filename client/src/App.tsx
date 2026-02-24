@@ -414,29 +414,34 @@ function HomePage() {
       )}
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
       <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-14">
-        <TopNav
-          currentPath="/"
-          advancedGlass
-          user={user}
-          isSessionLoading={isSessionLoading}
-          isSessionActionPending={isSessionActionPending}
-          login={login}
-          logout={logout}
-          connectedWallet={connectedWallet}
-          walletChainId={walletChainId}
-          isWalletConnecting={isWalletConnecting}
-          isWalletConnected={isWalletConnected}
-          walletProviderAvailable={walletProviderAvailable}
-          connectWallet={connectWallet}
-          disconnectWallet={disconnectWallet}
-        />
+        <div className="sticky top-0 z-30 flex flex-col gap-2 bg-[#040712]/80 backdrop-blur-md transition-all duration-300 shadow-md">
+          <TopNav
+            currentPath="/"
+            advancedGlass
+            user={user}
+            isSessionLoading={isSessionLoading}
+            isSessionActionPending={isSessionActionPending}
+            login={login}
+            logout={logout}
+            connectedWallet={connectedWallet}
+            walletChainId={walletChainId}
+            isWalletConnecting={isWalletConnecting}
+            isWalletConnected={isWalletConnected}
+            walletProviderAvailable={walletProviderAvailable}
+            connectWallet={connectWallet}
+            disconnectWallet={disconnectWallet}
+          />
+          <GlassPanel className="overflow-hidden rounded-2xl">
+            <BreakingNewsBanner />
+          </GlassPanel>
+        </div>
 
         <section className="text-center space-y-5 reveal">
           <p className="inline-flex rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-blue-200">
             Polymarket Intelligence
           </p>
           <div className="flex items-center justify-center gap-6">
-            <MetallicLogo size={115} animated />
+            <MetallicLogo size={230} animated />
             <h1 className="max-w-4xl text-2xl font-semibold leading-tight text-white sm:text-4xl">
               Discover top traders and track your own portfolio with confidence
             </h1>
@@ -595,7 +600,6 @@ function LeaderboardPage() {
         )}
 
         <section className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-blue-200">Leaderboard</p>
           <h1 className="text-3xl font-semibold text-white sm:text-4xl">Top Polymarket Traders</h1>
           <p className="max-w-2xl text-sm text-slate-300">
             Browse ranked traders by key metrics and click any wallet to inspect full profile details.
