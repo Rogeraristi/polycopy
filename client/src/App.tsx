@@ -429,9 +429,9 @@ function HomePage() {
             connectWallet={connectWallet}
             disconnectWallet={disconnectWallet}
           />
-          <GlassPanel advanced className="overflow-hidden rounded-2xl">
+          <div className="rounded-2xl">
             <BreakingNewsBanner />
-          </GlassPanel>
+          </div>
         </div>
 
         <section className="text-center space-y-5 reveal">
@@ -562,7 +562,7 @@ function LeaderboardPage() {
     <div className="min-h-screen bg-[#040712] text-slate-100">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
       <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-10">
-        <div className="sticky top-0 z-30 flex flex-col gap-2 bg-[#040712]/80 backdrop-blur-md transition-all duration-300 shadow-md">
+        <div className="sticky top-0 z-30 flex flex-col gap-2 transition-all duration-300 shadow-md">
           <TopNav
             currentPath="/leaderboard"
             user={user}

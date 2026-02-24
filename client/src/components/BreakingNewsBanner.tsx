@@ -191,7 +191,7 @@ export default function BreakingNewsBanner() {
 
   return (
     <div
-      className="w-full bg-gradient-to-r from-pink-600 via-rose-500 to-amber-400 text-white py-2 px-4 overflow-hidden relative flex items-center border-b border-rose-400/40"
+      className="w-full bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 text-white py-2 px-4 overflow-hidden relative flex items-center border-b border-blue-400/40"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
