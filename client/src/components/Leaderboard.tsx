@@ -17,7 +17,8 @@ export interface LeaderboardEntry {
 
 interface LeaderboardProps {
   entries: LeaderboardEntry[];
-  onSelect: (address: string) => void;
+  onSelect: (address: string, entry?: LeaderboardEntry) => void;
+  onPrefetch?: (address: string, entry?: LeaderboardEntry) => void;
   selectedAddress: string | null;
   isLoading?: boolean;
   error?: string | null;
@@ -75,18 +76,22 @@ function getAvatar(entry: LeaderboardEntry) {
 function PodiumCard({
   entry,
   onSelect,
+  onPrefetch,
   emphasized = false,
   compact = false
 }: {
   entry: LeaderboardEntry;
-  onSelect: (address: string) => void;
+  onSelect: (address: string, entry?: LeaderboardEntry) => void;
+  onPrefetch?: (address: string) => void;
   emphasized?: boolean;
   compact?: boolean;
 }) {
   return (
     <button
       type="button"
-      onClick={() => onSelect(entry.address)}
+      onClick={() => onSelect(entry.address, entry)}
+      onMouseEnter={() => onPrefetch?.(entry.address)}
+      onFocus={() => onPrefetch?.(entry.address)}
       className={`w-full rounded-2xl border p-4 text-left transition ${
         emphasized
           ? 'border-amber-300/50 bg-gradient-to-b from-amber-500/15 to-slate-900/80 shadow-lg shadow-amber-500/20'
@@ -130,6 +135,7 @@ function PodiumCard({
 export function Leaderboard({
   entries,
   onSelect,
+  onPrefetch,
   selectedAddress,
   isLoading = false,
   error = null,
@@ -277,9 +283,9 @@ export function Leaderboard({
       {!isLoading && !error && hasEntries && (
         <>
           <div className="grid gap-4 md:grid-cols-3 md:items-end">
-            <div className="reveal reveal-1">{second && <PodiumCard entry={second} onSelect={onSelect} compact />}</div>
-            <div className="reveal">{first && <PodiumCard entry={first} onSelect={onSelect} emphasized />}</div>
-            <div className="reveal reveal-2">{third && <PodiumCard entry={third} onSelect={onSelect} compact />}</div>
+            <div className="reveal reveal-1">{second && <PodiumCard entry={second} onSelect={onSelect} onPrefetch={onPrefetch} compact />}</div>
+            <div className="reveal">{first && <PodiumCard entry={first} onSelect={onSelect} onPrefetch={onPrefetch} emphasized />}</div>
+            <div className="reveal reveal-2">{third && <PodiumCard entry={third} onSelect={onSelect} onPrefetch={onPrefetch} compact />}</div>
           </div>
 
           <div className="overflow-x-auto rounded-2xl border border-slate-800/60 bg-slate-900/50 reveal reveal-1">
@@ -301,7 +307,8 @@ export function Leaderboard({
                   return (
                     <tr
                       key={trader.address}
-                      onClick={() => onSelect(trader.address)}
+                      onClick={() => onSelect(trader.address, trader)}
+                      onMouseEnter={() => onPrefetch?.(trader.address, trader)}
                       className={`cursor-pointer border-b border-slate-800/40 transition last:border-b-0 ${
                         isSelected ? 'bg-blue-500/10' : 'hover:bg-slate-800/50'
                       }`}

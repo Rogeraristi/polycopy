@@ -588,6 +588,40 @@ function computePortfolioSnapshotFromTrades(trades) {
   };
 }
 
+function computePnlFromTrades(trades) {
+  const realisedFromPayload = trades.reduce((acc, trade) => {
+    const explicit =
+      toFiniteNumber(trade?.realizedPnl) ??
+      toFiniteNumber(trade?.realizedPnL) ??
+      toFiniteNumber(trade?.pnl) ??
+      null;
+    return explicit === null ? acc : acc + explicit;
+  }, 0);
+
+  const hasExplicitRealised = trades.some((trade) => {
+    return (
+      toFiniteNumber(trade?.realizedPnl) !== null ||
+      toFiniteNumber(trade?.realizedPnL) !== null ||
+      toFiniteNumber(trade?.pnl) !== null
+    );
+  });
+
+  const fallbackExposure = trades.reduce((acc, trade) => {
+    const side = extractTradeSide(trade);
+    const size = extractTradeSize(trade);
+    const price = extractTradePrice(trade);
+    if (price === null) return acc;
+    return acc + (side === 'sell' ? 1 : -1) * size * price;
+  }, 0);
+
+  const pnl = hasExplicitRealised ? realisedFromPayload : Number(fallbackExposure.toFixed(4));
+  return {
+    pnl,
+    calculation: hasExplicitRealised ? 'sum_of_trade_realized_pnl_fields' : 'fallback_net_cashflow_proxy',
+    tradeCount: trades.length
+  };
+}
+
 async function fetchJson(url) {
   const response = await fetch(url, {
     headers: {
@@ -1192,38 +1226,91 @@ async function fetchFallbackLeaderboard(limit = LEADERBOARD_LIMIT) {
 
 
 async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
-  // Fetch leaderboard data from Apify Polymarket Leaderboard Scraper
-  const APIFY_LEADERBOARD_URL = process.env.APIFY_LEADERBOARD_URL ||
+  const APIFY_LEADERBOARD_URL =
+    process.env.APIFY_LEADERBOARD_URL ||
     'https://api.apify.com/v2/datasets/8QwKQwKQwKQwKQwKQ/items?format=json&clean=true';
-  // You can replace the above with your own Apify dataset URL
-  let periods = {};
-  let labels = {};
-  let source = 'apify';
-  let fetchedAt = Date.now();
-  let defaultPeriod = LEADERBOARD_DEFAULT_PERIOD;
-  try {
-    const response = await fetch(APIFY_LEADERBOARD_URL);
-    if (!response.ok) {
-      throw new Error(`Apify leaderboard fetch failed: ${response.status}`);
+
+  const periods = {};
+  const labels = {};
+  let source = 'polymarket';
+  const fetchedAt = Date.now();
+
+  const normaliseAndRank = (entries) => {
+    const safe = Array.isArray(entries) ? entries.filter(Boolean) : [];
+    return safe.slice(0, limit).map((entry, index) => ({
+      ...entry,
+      rank: index + 1
+    }));
+  };
+
+  // 1) Primary source: try fetching each period path independently.
+  await Promise.all(
+    Object.entries(LEADERBOARD_PERIODS).map(async ([periodKey, config]) => {
+      try {
+        const entries = await fetchLeaderboardFromPath(config.path, limit);
+        if (entries.length > 0) {
+          periods[periodKey] = normaliseAndRank(entries);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`Failed to fetch leaderboard period ${periodKey}`, message);
+      }
+    })
+  );
+
+  // 2) Secondary source: fallback scraper snapshot (usually weekly-like).
+  if (Object.keys(periods).length === 0) {
+    try {
+      const fallbackEntries = await fetchFallbackLeaderboard(limit);
+      if (fallbackEntries.length > 0) {
+        source = 'fallback';
+        periods.weekly = normaliseAndRank(fallbackEntries);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Failed to fetch fallback leaderboard snapshot', message);
     }
-    const apifyData = await response.json();
-    // Apify often returns a flat snapshot; expose all standard periods for the frontend filter UX.
-    const entries = normaliseLeaderboardEntries(apifyData, limit);
-    periods.today = entries;
-    periods.weekly = entries;
-    periods.monthly = entries;
-    periods.all = entries;
-    labels.today = LEADERBOARD_PERIODS.today.label;
-    labels.weekly = LEADERBOARD_PERIODS.weekly.label;
-    labels.monthly = LEADERBOARD_PERIODS.monthly.label;
-    labels.all = LEADERBOARD_PERIODS.all.label;
-    defaultPeriod = LEADERBOARD_DEFAULT_PERIOD;
-    fetchedAt = Date.now();
-  } catch (error) {
-    console.error('Failed to fetch leaderboard from Apify', error);
-    periods = {};
-    labels = {};
   }
+
+  // 3) Tertiary source: Apify flat snapshot, used only when site paths fail.
+  if (Object.keys(periods).length === 0) {
+    try {
+      const response = await fetch(APIFY_LEADERBOARD_URL);
+      if (!response.ok) {
+        throw new Error(`Apify leaderboard fetch failed: ${response.status}`);
+      }
+      const apifyData = await response.json();
+      const entries = normaliseLeaderboardEntries(apifyData, limit);
+      if (entries.length > 0) {
+        source = 'apify';
+        periods.weekly = normaliseAndRank(entries);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('Failed to fetch leaderboard from Apify', message);
+    }
+  }
+
+  // 4) Ensure all tabs exist while keeping distinct data where available.
+  const orderedKeys = Object.keys(LEADERBOARD_PERIODS);
+  for (const key of orderedKeys) {
+    labels[key] = LEADERBOARD_PERIODS[key].label;
+    if (!periods[key]) {
+      // Prefer the closest known bucket to avoid blank tabs.
+      periods[key] =
+        periods.weekly ||
+        periods.monthly ||
+        periods.all ||
+        periods.today ||
+        [];
+    }
+  }
+
+  const availableKeys = orderedKeys.filter((key) => Array.isArray(periods[key]) && periods[key].length > 0);
+  const defaultPeriod = availableKeys.includes(LEADERBOARD_DEFAULT_PERIOD)
+    ? LEADERBOARD_DEFAULT_PERIOD
+    : availableKeys[0] || LEADERBOARD_DEFAULT_PERIOD;
+
   return {
     periods,
     labels,
@@ -1997,38 +2084,11 @@ app.get('/api/users/:address/pnl', async (req, res) => {
   const { address } = req.params;
   try {
     const trades = await fetchUserTrades(address);
-    const realisedFromPayload = trades.reduce((acc, trade) => {
-      const explicit =
-        toFiniteNumber(trade?.realizedPnl) ??
-        toFiniteNumber(trade?.realizedPnL) ??
-        toFiniteNumber(trade?.pnl) ??
-        null;
-      return explicit === null ? acc : acc + explicit;
-    }, 0);
-
-    const hasExplicitRealised = trades.some((trade) => {
-      return (
-        toFiniteNumber(trade?.realizedPnl) !== null ||
-        toFiniteNumber(trade?.realizedPnL) !== null ||
-        toFiniteNumber(trade?.pnl) !== null
-      );
-    });
-
-    const fallbackExposure = trades.reduce((acc, trade) => {
-      const side = extractTradeSide(trade);
-      const size = extractTradeSize(trade);
-      const price = extractTradePrice(trade);
-      if (price === null) return acc;
-      return acc + (side === 'sell' ? 1 : -1) * size * price;
-    }, 0);
-
-    const pnl = hasExplicitRealised ? realisedFromPayload : Number(fallbackExposure.toFixed(4));
+    const pnlData = computePnlFromTrades(trades);
 
     res.json({
       address: address.toLowerCase(),
-      pnl,
-      calculation: hasExplicitRealised ? 'sum_of_trade_realized_pnl_fields' : 'fallback_net_cashflow_proxy',
-      tradeCount: trades.length
+      ...pnlData
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch PnL' });
@@ -2057,6 +2117,42 @@ app.get('/api/users/:address/open-orders', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch open orders' });
+  }
+});
+
+// GET /api/users/:address/overview
+app.get('/api/users/:address/overview', async (req, res) => {
+  const { address } = req.params;
+  try {
+    const trades = await fetchUserTrades(address);
+    const [portfolioValue] = await Promise.all([fetchUserTotalPositionValue(address)]);
+    const snapshot = computePortfolioSnapshotFromTrades(trades);
+    const pnlData = computePnlFromTrades(trades);
+    const openOrders = snapshot.openPositions.map((position) => ({
+      market: position.market,
+      side: position.side,
+      size: Math.abs(position.shares),
+      price: position.avgEntryPrice,
+      status: 'position_open'
+    }));
+
+    res.json({
+      address: address.toLowerCase(),
+      trades,
+      pnl: pnlData,
+      portfolio: {
+        portfolioValue,
+        marketCount: snapshot.marketCount,
+        notionalVolume: snapshot.notionalVolume
+      },
+      openOrders: {
+        openOrders,
+        derived: true,
+        note: 'Derived open positions from recent fills.'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch trader overview' });
   }
 });
 

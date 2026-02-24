@@ -13,6 +13,58 @@ import TraderProfile from './pages/TraderProfile';
 import MetallicLogoPreviewPage from './pages/MetallicLogoPreviewPage';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const OVERVIEW_PREFETCH_TTL_MS = 1000 * 60 * 3;
+const overviewPrefetchCache = new Map<
+  string,
+  { expiresAt: number; promise: Promise<any> | null; data: any | null }
+>();
+
+function getOverviewCacheKey(address: string) {
+  return `trader_overview_${address.toLowerCase()}`;
+}
+
+function persistOverview(address: string, payload: any) {
+  const key = getOverviewCacheKey(address);
+  const now = Date.now();
+  overviewPrefetchCache.set(address.toLowerCase(), {
+    expiresAt: now + OVERVIEW_PREFETCH_TTL_MS,
+    promise: null,
+    data: payload
+  });
+  if (typeof window !== 'undefined') {
+    try {
+      window.sessionStorage.setItem(key, JSON.stringify({ savedAt: now, payload }));
+    } catch {}
+  }
+}
+
+function prefetchTraderOverview(address: string) {
+  const normalized = String(address || '').trim().toLowerCase();
+  if (!normalized) return;
+  const now = Date.now();
+  const cached = overviewPrefetchCache.get(normalized);
+  if (cached && cached.expiresAt > now) return;
+
+  const promise = fetch(`${API_BASE}/users/${normalized}/overview`, { credentials: 'include' })
+    .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`overview ${res.status}`))))
+    .then((payload) => {
+      persistOverview(normalized, payload);
+      return payload;
+    })
+    .catch(() => null)
+    .finally(() => {
+      const current = overviewPrefetchCache.get(normalized);
+      if (current && current.promise) {
+        overviewPrefetchCache.set(normalized, { ...current, promise: null });
+      }
+    });
+
+  overviewPrefetchCache.set(normalized, {
+    expiresAt: now + OVERVIEW_PREFETCH_TTL_MS,
+    promise,
+    data: cached?.data || null
+  });
+}
 
 function shortAddress(address: string | null) {
   if (!address) return 'Not connected';
@@ -376,6 +428,9 @@ function LeaderboardPage() {
   } = useWalletConnection();
 
   const { activeEntries, periodOptions, selectedPeriod, onPeriodChange, isLoading, error } = useLeaderboardData();
+  const handlePrefetch = useCallback((address: string) => {
+    prefetchTraderOverview(address);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#040712] text-slate-100">
@@ -436,10 +491,15 @@ function LeaderboardPage() {
               onPeriodChange(next);
             }
           }}
-          onSelect={(address) => {
+          onSelect={(address, entry) => {
             setSelectedAddress(address);
-            navigate(`/profile/${address}`);
+            navigate(`/profile/${address}`, {
+              state: {
+                leaderboardEntry: entry || null
+              }
+            });
           }}
+          onPrefetch={(address) => handlePrefetch(address)}
         />
       </div>
     </div>

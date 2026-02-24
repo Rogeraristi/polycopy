@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import MetallicLogo from '../components/MetallicLogo';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import type { Trade } from '../hooks/useLiveTrades';
 import BreakingNewsBanner from '../components/BreakingNewsBanner';
 import GlassPanel from '../components/effects/GlassPanel';
@@ -26,7 +26,22 @@ type OpenOrdersPayload = {
   note?: string;
 };
 
+type LeaderboardContextEntry = {
+  displayName?: string | null;
+  rank?: number | null;
+  roi?: number | null;
+  pnl?: number | null;
+  volume?: number | null;
+  trades?: number | null;
+  avatarUrl?: string | null;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const OVERVIEW_CACHE_TTL_MS = 1000 * 60 * 3;
+
+function getOverviewCacheKey(address: string) {
+  return `trader_overview_${address.toLowerCase()}`;
+}
 
 function formatUsd(value: number | null) {
   if (value === null || !Number.isFinite(value)) return '—';
@@ -39,28 +54,97 @@ function formatUsd(value: number | null) {
 
 export default function TraderProfile() {
   const { address } = useParams<{ address: string }>();
+  const location = useLocation();
+  const navigationEntry = (location.state as { leaderboardEntry?: LeaderboardContextEntry } | null)?.leaderboardEntry || null;
   const [trades, setTrades] = useState<Trade[]>([]);
   const [pnl, setPnl] = useState<PnlPayload | null>(null);
   const [portfolio, setPortfolio] = useState<PortfolioPayload | null>(null);
   const [openOrders, setOpenOrders] = useState<OpenOrdersPayload | null>(null);
+  const [leaderboardContext, setLeaderboardContext] = useState<LeaderboardContextEntry | null>(navigationEntry);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLeaderboardContext(navigationEntry);
+  }, [navigationEntry, address]);
 
   useEffect(() => {
     if (!address) return;
     let cancelled = false;
     const controller = new AbortController();
+    const normalizedAddress = address.toLowerCase();
+    const applyOverviewPayload = (overview: any) => {
+      const nextTrades = Array.isArray(overview?.trades) ? overview.trades : [];
+      const nextPnl =
+        typeof overview?.pnl?.pnl === 'number'
+          ? overview.pnl.pnl
+          : typeof leaderboardContext?.pnl === 'number'
+          ? leaderboardContext.pnl
+          : null;
+      const nextPortfolio =
+        typeof overview?.portfolio?.portfolioValue === 'number' ? overview.portfolio.portfolioValue : null;
 
-    setLoading(true);
+      setTrades(nextTrades);
+      setPnl({
+        pnl: nextPnl,
+        calculation: typeof overview?.pnl?.calculation === 'string' ? overview.pnl.calculation : undefined,
+        tradeCount:
+          typeof overview?.pnl?.tradeCount === 'number'
+            ? overview.pnl.tradeCount
+            : typeof leaderboardContext?.trades === 'number'
+            ? leaderboardContext.trades
+            : undefined
+      });
+      setPortfolio({ portfolioValue: nextPortfolio });
+      setOpenOrders({
+        openOrders: Array.isArray(overview?.openOrders?.openOrders) ? overview.openOrders.openOrders : [],
+        note: typeof overview?.openOrders?.note === 'string' ? overview.openOrders.note : undefined
+      });
+    };
+
+    let hydratedFromCache = false;
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = window.sessionStorage.getItem(getOverviewCacheKey(normalizedAddress));
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          const savedAt = Number(parsed?.savedAt || 0);
+          if (savedAt > 0 && Date.now() - savedAt <= OVERVIEW_CACHE_TTL_MS && parsed?.payload) {
+            applyOverviewPayload(parsed.payload);
+            hydratedFromCache = true;
+          }
+        }
+      } catch {}
+    }
+
+    setLoading(!hydratedFromCache);
     setError(null);
 
-    Promise.all([
-      fetch(`${API_BASE}/users/${address}/trades`, { signal: controller.signal, credentials: 'include' }),
-      fetch(`${API_BASE}/users/${address}/pnl`, { signal: controller.signal, credentials: 'include' }),
-      fetch(`${API_BASE}/users/${address}/portfolio`, { signal: controller.signal, credentials: 'include' }),
-      fetch(`${API_BASE}/users/${address}/open-orders`, { signal: controller.signal, credentials: 'include' })
-    ])
-      .then(async ([tradesRes, pnlRes, portfolioRes, ordersRes]) => {
+    fetch(`${API_BASE}/users/${address}/overview`, { signal: controller.signal, credentials: 'include' })
+      .then(async (overviewRes) => {
+        if (overviewRes.ok) {
+          const overview = await overviewRes.json();
+          if (cancelled) return;
+          applyOverviewPayload(overview);
+          if (typeof window !== 'undefined') {
+            try {
+              window.sessionStorage.setItem(
+                getOverviewCacheKey(normalizedAddress),
+                JSON.stringify({ savedAt: Date.now(), payload: overview })
+              );
+            } catch {}
+          }
+          return;
+        }
+
+        // Fallback for older backend versions without overview endpoint.
+        const [tradesRes, pnlRes, portfolioRes, ordersRes] = await Promise.all([
+          fetch(`${API_BASE}/users/${address}/trades`, { signal: controller.signal, credentials: 'include' }),
+          fetch(`${API_BASE}/users/${address}/pnl`, { signal: controller.signal, credentials: 'include' }),
+          fetch(`${API_BASE}/users/${address}/portfolio`, { signal: controller.signal, credentials: 'include' }),
+          fetch(`${API_BASE}/users/${address}/open-orders`, { signal: controller.signal, credentials: 'include' })
+        ]);
+
         if (!tradesRes.ok) throw new Error(`Failed to load trades (${tradesRes.status})`);
         if (!pnlRes.ok) throw new Error(`Failed to load pnl (${pnlRes.status})`);
         if (!portfolioRes.ok) throw new Error(`Failed to load portfolio (${portfolioRes.status})`);
@@ -77,9 +161,19 @@ export default function TraderProfile() {
 
         setTrades(Array.isArray(tradesData?.trades) ? tradesData.trades : []);
         setPnl({
-          pnl: typeof pnlData?.pnl === 'number' ? pnlData.pnl : null,
+          pnl:
+            typeof pnlData?.pnl === 'number'
+              ? pnlData.pnl
+              : typeof leaderboardContext?.pnl === 'number'
+              ? leaderboardContext.pnl
+              : null,
           calculation: typeof pnlData?.calculation === 'string' ? pnlData.calculation : undefined,
-          tradeCount: typeof pnlData?.tradeCount === 'number' ? pnlData.tradeCount : undefined
+          tradeCount:
+            typeof pnlData?.tradeCount === 'number'
+              ? pnlData.tradeCount
+              : typeof leaderboardContext?.trades === 'number'
+              ? leaderboardContext.trades
+              : undefined
         });
         setPortfolio({
           portfolioValue: typeof portfolioData?.portfolioValue === 'number' ? portfolioData.portfolioValue : null
@@ -101,7 +195,7 @@ export default function TraderProfile() {
       cancelled = true;
       controller.abort();
     };
-  }, [address]);
+  }, [address, leaderboardContext?.pnl, leaderboardContext?.trades]);
 
   const tradeRows = useMemo(() => {
     return trades.map((trade, i) => ({
@@ -203,6 +297,20 @@ export default function TraderProfile() {
         <GlassPanel className="rounded-2xl p-4 text-sm text-slate-300">
           Address: <span className="font-mono break-all text-slate-100">{address}</span>
         </GlassPanel>
+
+        {leaderboardContext && (
+          <GlassPanel className="rounded-2xl p-4">
+            <div className="flex flex-wrap items-center gap-4 text-sm text-slate-300">
+              <span className="font-semibold text-slate-100">
+                {leaderboardContext.displayName || 'Trader'}
+              </span>
+              {typeof leaderboardContext.rank === 'number' && <span>Rank #{leaderboardContext.rank}</span>}
+              {typeof leaderboardContext.roi === 'number' && <span>ROI {leaderboardContext.roi.toFixed(1)}%</span>}
+              {typeof leaderboardContext.pnl === 'number' && <span>P&L {formatUsd(leaderboardContext.pnl)}</span>}
+              {typeof leaderboardContext.volume === 'number' && <span>Volume {formatUsd(leaderboardContext.volume)}</span>}
+            </div>
+          </GlassPanel>
+        )}
 
         {loading && <GlassPanel className="rounded-2xl p-4">Loading…</GlassPanel>}
         {error && <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-rose-200">{error}</div>}

@@ -81,6 +81,13 @@ export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64, an
     const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     shouldAnimateRef.current = !reducedMotion;
 
+    // Render at device pixel ratio for crispness
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = size * dpr;
+    canvas.height = size * dpr;
+    canvas.style.width = `${size}px`;
+    canvas.style.height = `${size}px`;
+
     let intersectionObserver: IntersectionObserver | null = null;
     if (typeof window !== 'undefined' && 'IntersectionObserver' in window) {
       intersectionObserver = new IntersectionObserver(
@@ -127,15 +134,21 @@ export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64, an
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.uniform1i(gl.getUniformLocation(program, 'u_image'), 0);
 
-      // Animation loop
+      // Animation loop with smoother timing and easing
+      let lastTime = 0;
       function render(time: number) {
         if (!shouldAnimateRef.current) {
           animationRef.current = requestAnimationFrame(render);
           return;
         }
+        // Use high precision delta for smoothness
+        const delta = (time - lastTime) * 0.001;
+        lastTime = time;
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.uniform1f(gl.getUniformLocation(program, 'u_time'), time * 0.001);
+        // Use an eased time for metallic effect
+        const easedTime = Math.sin(time * 0.001) * 0.5 + 0.5;
+        gl.uniform1f(gl.getUniformLocation(program, 'u_time'), easedTime * time * 0.001);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         animationRef.current = requestAnimationFrame(render);
       }
