@@ -57,27 +57,20 @@ interface MetallicLogoProps {
   animated?: boolean;
 }
 
-export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64, animated = false }: MetallicLogoProps) {
-  if (!animated) {
-    return (
-      <img
-        src={src}
-        alt="logo"
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        className="rounded-full object-cover"
-        style={{ width: size, height: size, display: 'block' }}
-      />
-    );
-  }
-
+export default function MetallicLogo({ src = '/polycopy-logo3.png', size = 64, animated = false }: MetallicLogoProps) {
+  const [fallback, setFallback] = React.useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const shouldAnimateRef = useRef(true);
+  const shouldUseCanvas = animated && !fallback;
 
   useEffect(() => {
+    if (!animated) return;
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {
+      setFallback(true);
+      return;
+    }
     const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     shouldAnimateRef.current = !reducedMotion;
 
@@ -100,15 +93,28 @@ export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64, an
       intersectionObserver.observe(canvas);
     }
 
-    const gl = canvas.getContext('webgl');
+    let gl: WebGLRenderingContext | null = null;
+    try {
+      gl = canvas.getContext('webgl');
+    } catch {
+      gl = null;
+    }
     if (!gl) {
+      setFallback(true);
       intersectionObserver?.disconnect();
       return;
     }
 
     // Setup shaders and program
-    const program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
-    gl.useProgram(program);
+    let program: WebGLProgram;
+    try {
+      program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
+      gl.useProgram(program);
+    } catch {
+      setFallback(true);
+      intersectionObserver?.disconnect();
+      return;
+    }
 
     // Setup geometry
     const positionBuffer = gl.createBuffer();
@@ -124,6 +130,9 @@ export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64, an
     const image = new window.Image();
     image.crossOrigin = 'anonymous';
     image.src = src;
+    image.onerror = () => {
+      setFallback(true);
+    };
     image.onload = () => {
       const texture = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -158,7 +167,20 @@ export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64, an
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       intersectionObserver?.disconnect();
     };
-  }, [src, size]);
+  }, [animated, src, size]);
+
+  if (!shouldUseCanvas) {
+    return (
+      <img
+        src={src}
+        alt="logo"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        className="rounded-full object-cover"
+        style={{ width: size, height: size, display: 'block' }}
+      />
+    );
+  }
 
   return (
     <canvas
@@ -169,7 +191,7 @@ export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64, an
         width: size,
         height: size,
         display: 'block',
-        background: '#000', // Black background for black mscreen effect
+        background: 'transparent',
         borderRadius: '50%',
       }}
     />

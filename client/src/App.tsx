@@ -71,6 +71,14 @@ function shortAddress(address: string | null) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+function getUserInitials(name: string | null | undefined) {
+  if (!name) return null;
+  const parts = name.trim().split(/\s+/).slice(0, 2);
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+}
+
 function useLeaderboardData() {
   const [leaderboardPeriods, setLeaderboardPeriods] = useState<Record<string, LeaderboardEntry[]>>({});
   const [leaderboardLabels, setLeaderboardLabels] = useState<Record<string, string>>({});
@@ -159,6 +167,7 @@ function useLeaderboardData() {
 
 interface TopNavProps {
   currentPath: '/' | '/leaderboard';
+  advancedGlass?: boolean;
   user: ReturnType<typeof useSession>['user'];
   isSessionLoading: boolean;
   isSessionActionPending: boolean;
@@ -175,6 +184,7 @@ interface TopNavProps {
 
 function TopNav({
   currentPath,
+  advancedGlass = false,
   user,
   isSessionLoading,
   isSessionActionPending,
@@ -188,6 +198,8 @@ function TopNav({
   connectWallet,
   disconnectWallet
 }: TopNavProps) {
+  const initials = getUserInitials(user?.name);
+
   const handleSessionClick = useCallback(() => {
     if (user) {
       void logout();
@@ -206,11 +218,11 @@ function TopNav({
   }, [walletProviderAvailable, isWalletConnected, disconnectWallet, connectWallet]);
 
   return (
-    <GlassPanel className="px-6 py-4">
+    <GlassPanel advanced={advancedGlass} className="px-6 py-4">
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400" />
+            <MetallicLogo size={36} animated={currentPath === '/'} />
             <div>
               <p className="text-sm font-semibold tracking-wide text-white">PolyCopy</p>
               <p className="text-xs text-slate-400">Built for Polymarket</p>
@@ -238,7 +250,20 @@ function TopNav({
             disabled={(Boolean(user) && (isSessionLoading || isSessionActionPending)) || isSessionActionPending}
             className="rounded-full border border-slate-700/80 bg-slate-900/80 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:opacity-60"
           >
-            {user ? (isSessionLoading ? 'Loading...' : 'Sign out') : 'Sign in'}
+            {isSessionLoading ? (
+              'Loading...'
+            ) : user ? (
+              <span className="inline-flex items-center gap-2">
+                {initials && (
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-800/80 text-xs font-semibold">
+                    {initials}
+                  </span>
+                )}
+                <span>Sign out</span>
+              </span>
+            ) : (
+              'Sign in'
+            )}
           </button>
           <button
             type="button"
@@ -301,6 +326,7 @@ function HomePage() {
       <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-14">
         <TopNav
           currentPath="/"
+          advancedGlass
           user={user}
           isSessionLoading={isSessionLoading}
           isSessionActionPending={isSessionActionPending}

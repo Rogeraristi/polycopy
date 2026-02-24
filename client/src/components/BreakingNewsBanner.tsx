@@ -196,7 +196,7 @@ export default function BreakingNewsBanner() {
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"
-                    className="h-5 w-5 rounded-full object-cover border border-white/25"
+                    className="h-6 w-6 rounded-full object-cover border border-white/25"
                   />
                 )}
                 <span className="text-white">LIVE</span>
