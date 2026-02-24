@@ -208,6 +208,7 @@ export function Leaderboard({
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
           <h2 className="text-2xl font-semibold text-white">Top Polymarket traders</h2>
+          {/* Only show this heading once for clarity */}
           <p className="text-sm text-slate-400">Click any trader to open their profile and inspect full metrics.</p>
         </div>
         {hasPeriodControls && (

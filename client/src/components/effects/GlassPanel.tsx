@@ -19,10 +19,10 @@ export default function GlassPanel({ className = '', children }: GlassPanelProps
       backgroundOpacity={0.08}
       saturation={1.15}
       distortionScale={-140}
-      className={`!items-stretch !justify-start ${className}`}
+      className="!items-stretch !justify-start"
       style={{ minHeight: 0 }}
     >
-      {children}
+      <div className={`w-full ${className}`}>{children}</div>
     </GlassSurface>
   );
 }
