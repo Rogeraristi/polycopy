@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import GlassPanel from './effects/GlassPanel';
 
 export interface LeaderboardEntry {
   address: string;
@@ -176,7 +177,7 @@ export function Leaderboard({
 
   if (isLoading) {
     return (
-      <section className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 space-y-6">
+      <GlassPanel className="rounded-3xl p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="h-8 w-56 animate-pulse rounded bg-slate-800/80" />
           <div className="h-8 w-40 animate-pulse rounded-full bg-slate-800/80" />
@@ -198,12 +199,12 @@ export function Leaderboard({
             ))}
           </div>
         </div>
-      </section>
+      </GlassPanel>
     );
   }
 
   return (
-    <section className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 space-y-6">
+    <GlassPanel className="rounded-3xl p-6 space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
           <h2 className="text-2xl font-semibold text-white">Top Polymarket traders</h2>
@@ -335,6 +336,6 @@ export function Leaderboard({
           </div>
         </>
       )}
-    </section>
+    </GlassPanel>
   );
 }

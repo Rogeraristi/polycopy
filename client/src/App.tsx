@@ -4,6 +4,8 @@ import { Leaderboard, type LeaderboardEntry } from './components/Leaderboard';
 import BreakingNewsBanner from './components/BreakingNewsBanner';
 import { TraderDashboard } from './components/TraderDashboard';
 import { TraderSearch } from './components/TraderSearch';
+import Beams from './components/effects/Beams';
+import GlassPanel from './components/effects/GlassPanel';
 import { useSession } from './hooks/useSession';
 import { useTraderSearch } from './hooks/useTraderSearch';
 import { useWalletConnection } from './hooks/useWalletConnection';
@@ -151,8 +153,8 @@ function TopNav({
   }, [walletProviderAvailable, isWalletConnected, disconnectWallet, connectWallet]);
 
   return (
-    <header className="rounded-2xl border border-slate-800/70 bg-slate-950/70 px-6 py-4 backdrop-blur">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <GlassPanel className="px-6 py-4">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400" />
@@ -195,8 +197,8 @@ function TopNav({
           </button>
           {isWalletConnected && walletChainId && <span className="text-xs text-slate-400">Chain {walletChainId}</span>}
         </div>
-      </div>
-    </header>
+      </header>
+    </GlassPanel>
   );
 }
 
@@ -239,8 +241,11 @@ function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#040712] text-slate-100">
+      <div className="pointer-events-none fixed inset-0 z-0 opacity-65">
+        <Beams beamWidth={2.1} beamHeight={25} beamNumber={50} noiseIntensity={0.15} scale={0.27} rotation={39} speed={1.4} />
+      </div>
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
-      <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-14">
+      <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-14">
         <TopNav
           currentPath="/"
           user={user}
@@ -278,20 +283,25 @@ function HomePage() {
         </section>
 
         {combinedTopError && (
-          <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">{combinedTopError}</div>
+          <GlassPanel className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            {combinedTopError}
+          </GlassPanel>
         )}
 
         <section className="grid gap-5 lg:grid-cols-3">
-          <article className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 reveal reveal-1">
+          <GlassPanel className="rounded-3xl p-6 reveal reveal-1">
+            <article>
             <p className="text-xs uppercase tracking-wide text-blue-200">Leaderboard</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">Follow the most successful traders</h2>
             <p className="mt-3 text-sm text-slate-300">Open the leaderboard to compare PnL, ROI, and volume at a glance.</p>
             <Link to="/leaderboard" className="mt-5 inline-flex rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900">
               Open Leaderboard
             </Link>
-          </article>
+            </article>
+          </GlassPanel>
 
-          <article id="search" className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 reveal reveal-2">
+          <GlassPanel className="rounded-3xl p-6 reveal reveal-2">
+            <article id="search">
             <p className="text-xs uppercase tracking-wide text-blue-200">Search Traders</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">Analyze any wallet</h2>
             <p className="mt-3 text-sm text-slate-300">Search by wallet or username and inspect the trader profile instantly.</p>
@@ -309,13 +319,15 @@ function HomePage() {
                 selectedAddress={selectedAddress}
               />
             </div>
-          </article>
+            </article>
+          </GlassPanel>
 
-          <article className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 reveal reveal-3">
+          <GlassPanel className="rounded-3xl p-6 reveal reveal-3">
+            <article>
             <p className="text-xs uppercase tracking-wide text-blue-200">Portfolio View</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">Track your own edge</h2>
             <p className="mt-3 text-sm text-slate-300">Compare your process with top traders and refine your strategy over time.</p>
-            <div className="mt-5 rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
+            <GlassPanel className="mt-5 rounded-2xl p-4">
               <p className="text-xs uppercase text-slate-400">Selected trader</p>
               <p className="mt-1 font-mono text-sm text-slate-100 break-all">{selectedAddress || 'No trader selected yet'}</p>
               {selectedAddress && (
@@ -326,8 +338,9 @@ function HomePage() {
                   View trader profile
                 </Link>
               )}
-            </div>
-          </article>
+            </GlassPanel>
+            </article>
+          </GlassPanel>
         </section>
 
         {selectedAddress && <TraderDashboard address={selectedAddress} />}
@@ -366,7 +379,7 @@ function LeaderboardPage() {
   return (
     <div className="min-h-screen bg-[#040712] text-slate-100">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
-      <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-10">
+      <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-10">
         <TopNav
           currentPath="/leaderboard"
           user={user}
@@ -383,12 +396,12 @@ function LeaderboardPage() {
           disconnectWallet={disconnectWallet}
         />
 
-        <div className="overflow-hidden rounded-2xl border border-slate-800/60">
+        <GlassPanel className="overflow-hidden rounded-2xl">
           <BreakingNewsBanner />
-        </div>
+        </GlassPanel>
 
         {(sessionError || walletError) && (
-          <div className="flex items-start justify-between gap-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+          <GlassPanel className="flex items-start justify-between gap-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
             <p>{sessionError || walletError}</p>
             {walletError && (
               <button
@@ -399,7 +412,7 @@ function LeaderboardPage() {
                 Dismiss
               </button>
             )}
-          </div>
+          </GlassPanel>
         )}
 
         <section className="space-y-3">

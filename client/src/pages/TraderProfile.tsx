@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { Trade } from '../hooks/useLiveTrades';
 import BreakingNewsBanner from '../components/BreakingNewsBanner';
+import GlassPanel from '../components/effects/GlassPanel';
 
 type PnlPayload = {
   pnl: number | null;
@@ -179,9 +180,9 @@ export default function TraderProfile() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <div className="mx-auto max-w-6xl px-6 py-10 space-y-6">
-        <div className="overflow-hidden rounded-2xl border border-slate-800/60">
+        <GlassPanel className="overflow-hidden rounded-2xl">
           <BreakingNewsBanner />
-        </div>
+        </GlassPanel>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -198,11 +199,11 @@ export default function TraderProfile() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4 text-sm text-slate-300">
+        <GlassPanel className="rounded-2xl p-4 text-sm text-slate-300">
           Address: <span className="font-mono break-all text-slate-100">{address}</span>
-        </div>
+        </GlassPanel>
 
-        {loading && <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">Loading…</div>}
+        {loading && <GlassPanel className="rounded-2xl p-4">Loading…</GlassPanel>}
         {error && <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-rose-200">{error}</div>}
 
         {!loading && !error && (
