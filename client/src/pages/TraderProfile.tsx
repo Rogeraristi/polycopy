@@ -177,80 +177,80 @@ export default function TraderProfile() {
   }, [trades]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
+    <div className="brand-grid min-h-screen text-slate-100">
       <div className="mx-auto max-w-6xl px-6 py-10 space-y-6">
-        <div className="overflow-hidden rounded-2xl border border-slate-800/60">
+        <div className="overflow-hidden rounded-2xl border border-[#1f2d4d]">
           <BreakingNewsBanner />
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/polycopy-logo3.png" alt="PolyCopy Logo" className="h-8 w-8" style={{ background: 'none' }} />
-            <h1 className="text-2xl font-semibold">Trader Profile</h1>
+            <img src="/polycopy-logo3.png" alt="PolyCopy Logo" className="h-9 w-9 rounded-lg border border-[#2b4068] bg-[#0a1226] p-1" />
+            <h1 className="brand-heading text-2xl font-semibold">Trader Profile</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/" className="rounded-full border border-slate-700 px-4 py-2 text-sm hover:border-slate-500">
+            <Link to="/" className="brand-outline-button px-4 py-2 text-sm">
               Dashboard
             </Link>
-            <Link to="/leaderboard" className="rounded-full border border-slate-700 px-4 py-2 text-sm hover:border-slate-500">
+            <Link to="/leaderboard" className="brand-button px-4 py-2 text-sm">
               Leaderboard
             </Link>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4 text-sm text-slate-300">
-          Address: <span className="font-mono break-all text-slate-100">{address}</span>
+        <div className="card p-4 text-sm text-[#a8bbdf]">
+          Address: <span className="font-mono break-all text-[#e5efff]">{address}</span>
         </div>
 
-        {loading && <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">Loading…</div>}
+        {loading && <div className="card p-4">Loading…</div>}
         {error && <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-rose-200">{error}</div>}
 
         {!loading && !error && (
           <>
             <section className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
-              <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
-                <p className="text-xs uppercase text-slate-500">PnL</p>
+              <div className="card p-4">
+                <p className="text-xs uppercase text-[#8fa5cb]">PnL</p>
                 <p className={`mt-2 text-xl font-semibold ${(pnl?.pnl ?? 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
                   {formatUsd(pnl?.pnl ?? null)}
                 </p>
-                {pnl?.calculation && <p className="mt-1 text-xs text-slate-500">Method: {pnl.calculation}</p>}
+                {pnl?.calculation && <p className="mt-1 text-xs text-[#8fa5cb]">Method: {pnl.calculation}</p>}
               </div>
-              <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
-                <p className="text-xs uppercase text-slate-500">Portfolio Value</p>
+              <div className="card p-4">
+                <p className="text-xs uppercase text-[#8fa5cb]">Portfolio Value</p>
                 <p className="mt-2 text-xl font-semibold text-slate-100">{formatUsd(portfolio?.portfolioValue ?? null)}</p>
               </div>
-              <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
-                <p className="text-xs uppercase text-slate-500">Trades Loaded</p>
+              <div className="card p-4">
+                <p className="text-xs uppercase text-[#8fa5cb]">Trades Loaded</p>
                 <p className="mt-2 text-xl font-semibold text-slate-100">{pnl?.tradeCount ?? trades.length}</p>
               </div>
-              <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
-                <p className="text-xs uppercase text-slate-500">Total Notional</p>
+              <div className="card p-4">
+                <p className="text-xs uppercase text-[#8fa5cb]">Total Notional</p>
                 <p className="mt-2 text-xl font-semibold text-slate-100">{formatUsd(derivedMetrics.totalNotional)}</p>
               </div>
-              <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
-                <p className="text-xs uppercase text-slate-500">Markets Traded</p>
+              <div className="card p-4">
+                <p className="text-xs uppercase text-[#8fa5cb]">Markets Traded</p>
                 <p className="mt-2 text-xl font-semibold text-slate-100">{derivedMetrics.marketCount}</p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-[#8fa5cb]">
                   Buys {derivedMetrics.buyCount} · Sells {derivedMetrics.sellCount}
                 </p>
               </div>
-              <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
-                <p className="text-xs uppercase text-slate-500">Avg Trade Size</p>
+              <div className="card p-4">
+                <p className="text-xs uppercase text-[#8fa5cb]">Avg Trade Size</p>
                 <p className="mt-2 text-xl font-semibold text-slate-100">
                   {Number.isFinite(derivedMetrics.avgTradeSize) ? derivedMetrics.avgTradeSize.toFixed(2) : '—'}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">{derivedMetrics.lastTradeAt ? `Last trade: ${derivedMetrics.lastTradeAt}` : 'No recency data'}</p>
+                <p className="mt-1 text-xs text-[#8fa5cb]">{derivedMetrics.lastTradeAt ? `Last trade: ${derivedMetrics.lastTradeAt}` : 'No recency data'}</p>
               </div>
             </section>
 
-            <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
-              <h2 className="text-lg font-semibold">Open Positions (Derived)</h2>
-              {openOrders?.note && <p className="text-xs text-slate-500">{openOrders.note}</p>}
+            <section className="card space-y-3 p-4">
+              <h2 className="brand-heading text-lg font-semibold">Open Positions (Derived)</h2>
+              {openOrders?.note && <p className="text-xs text-[#8fa5cb]">{openOrders.note}</p>}
               {openOrders?.openOrders?.length ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
                     <thead>
-                      <tr className="text-left text-slate-400">
+                      <tr className="text-left text-[#8fa5cb]">
                         <th className="px-3 py-2">Market</th>
                         <th className="px-3 py-2">Side</th>
                         <th className="px-3 py-2 text-right">Size</th>
@@ -260,7 +260,7 @@ export default function TraderProfile() {
                     </thead>
                     <tbody>
                       {openOrders.openOrders.map((order, index) => (
-                        <tr key={`${order.market || 'market'}-${index}`} className="border-t border-slate-800/60">
+                        <tr key={`${order.market || 'market'}-${index}`} className="border-t border-[#26395f]">
                           <td className="px-3 py-2">{order.market || 'Unknown'}</td>
                           <td className="px-3 py-2 uppercase">{order.side || '—'}</td>
                           <td className="px-3 py-2 text-right">{typeof order.size === 'number' ? order.size.toFixed(4) : '—'}</td>
@@ -272,17 +272,17 @@ export default function TraderProfile() {
                   </table>
                 </div>
               ) : (
-                <p className="text-sm text-slate-400">No open positions found.</p>
+                <p className="text-sm text-[#8fa5cb]">No open positions found.</p>
               )}
             </section>
 
-            <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
-              <h2 className="text-lg font-semibold">Trade History</h2>
+            <section className="card space-y-3 p-4">
+              <h2 className="brand-heading text-lg font-semibold">Trade History</h2>
               {tradeRows.length ? (
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
                     <thead>
-                      <tr className="text-left text-slate-400">
+                      <tr className="text-left text-[#8fa5cb]">
                         <th className="px-3 py-2">Date</th>
                         <th className="px-3 py-2">Market</th>
                         <th className="px-3 py-2">Side</th>
@@ -292,7 +292,7 @@ export default function TraderProfile() {
                     </thead>
                     <tbody>
                       {tradeRows.map((row) => (
-                        <tr key={row.id} className="border-t border-slate-800/60">
+                        <tr key={row.id} className="border-t border-[#26395f]">
                           <td className="px-3 py-2">{row.date ? new Date(row.date).toLocaleString() : '—'}</td>
                           <td className="px-3 py-2">{row.market}</td>
                           <td className="px-3 py-2">{row.side}</td>

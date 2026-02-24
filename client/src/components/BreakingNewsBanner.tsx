@@ -156,14 +156,14 @@ export default function BreakingNewsBanner() {
 
   return (
     <div
-      className="w-full bg-gradient-to-r from-pink-600 via-rose-500 to-amber-400 text-white py-2 px-4 overflow-hidden relative flex items-center border-b border-rose-400/40"
+      className="w-full bg-gradient-to-r from-[#0a1836] via-[#102b58] to-[#0e365f] text-white py-2 px-4 overflow-hidden relative flex items-center border-b border-[#2b4068]"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      <img src="/fire.svg" alt="Breaking News" className="h-5 w-5 mr-2 animate-pulse" />
-      <span className="font-bold uppercase tracking-widest mr-4">Breaking News</span>
+      <span className="mr-2 text-sm">●</span>
+      <span className="mr-4 text-xs font-bold uppercase tracking-widest text-[#9ed8e8]">Breaking Markets</span>
       <div className="flex-1 overflow-hidden">
-        <div ref={tickerRef} className="whitespace-nowrap flex gap-8 text-sm font-medium" style={{ willChange: 'transform' }}>
+        <div ref={tickerRef} className="whitespace-nowrap flex gap-8 text-sm font-medium text-[#e5efff]" style={{ willChange: 'transform' }}>
           {headlines.length === 0 ? (
             <span className="opacity-70">Loading markets…</span>
           ) : (
@@ -180,7 +180,7 @@ export default function BreakingNewsBanner() {
                   {h.chance === null ? 'N/A chance' : `${Math.round(h.chance)}% chance`}
                 </span>
                 {typeof h.volume24h === 'number' && Number.isFinite(h.volume24h) && (
-                  <span className="text-blue-100/90">${Math.round(h.volume24h).toLocaleString()} 24h vol</span>
+                  <span className="text-[#9ed8e8]">${Math.round(h.volume24h).toLocaleString()} 24h vol</span>
                 )}
               </a>
             ))
