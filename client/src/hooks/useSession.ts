@@ -24,6 +24,8 @@ interface UseSessionResult {
   logout: () => Promise<void>;
 }
 
+const SESSION_CACHE_KEY = 'polycopy.session.cache.v1';
+
 function extractErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -35,8 +37,18 @@ function extractErrorMessage(error: unknown, fallback: string) {
 }
 
 export function useSession(): UseSessionResult {
-  const [user, setUser] = useState<SessionUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState<SessionUser | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = window.localStorage.getItem(SESSION_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? (parsed as SessionUser) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isLoading, setIsLoading] = useState(() => (typeof window === 'undefined' ? true : !Boolean(user)));
   const [isActionPending, setIsActionPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,14 +65,25 @@ export function useSession(): UseSessionResult {
         throw new Error(text || `Session request failed (${response.status})`);
       }
       const payload = (await response.json()) as SessionResponse;
-      setUser(payload?.user ?? null);
+      const nextUser = payload?.user ?? null;
+      setUser(nextUser);
+      if (typeof window !== 'undefined') {
+        if (nextUser) {
+          window.localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(nextUser));
+        } else {
+          window.localStorage.removeItem(SESSION_CACHE_KEY);
+        }
+      }
     } catch (refreshError) {
       setUser(null);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(SESSION_CACHE_KEY);
+      }
       setError(extractErrorMessage(refreshError, 'Unable to determine session state right now.'));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [API_BASE]);
 
     const login = useCallback(() => {
       // Always redirect to homepage after login to avoid malformed URLs

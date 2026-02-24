@@ -180,10 +180,10 @@ function TopNav({
           <button
             type="button"
             onClick={handleSessionClick}
-            disabled={isSessionLoading || isSessionActionPending}
+            disabled={(Boolean(user) && (isSessionLoading || isSessionActionPending)) || isSessionActionPending}
             className="rounded-full border border-slate-700/80 bg-slate-900/80 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:opacity-60"
           >
-            {isSessionLoading ? 'Loading...' : user ? 'Sign out' : 'Sign in'}
+            {user ? (isSessionLoading ? 'Loading...' : 'Sign out') : 'Sign in'}
           </button>
           <button
             type="button"
@@ -226,8 +226,8 @@ function HomePage() {
 
   const { suggestions, isLoading: isSearchingTraders, error: traderSearchError } = useTraderSearch(inputAddress, {
     minimumLength: 2,
-    debounceMs: 240,
-    limit: 8
+    debounceMs: 140,
+    limit: 12
   });
 
   const applySelectedAddress = useCallback((address: string) => {

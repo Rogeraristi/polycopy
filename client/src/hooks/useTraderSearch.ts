@@ -21,6 +21,7 @@ export function useTraderSearch(query: string, options: TraderSearchOptions = {}
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounceHandle = useRef<number | null>(null);
+  const cacheRef = useRef<Map<string, LeaderboardEntry[]>>(new Map());
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -44,6 +45,14 @@ export function useTraderSearch(query: string, options: TraderSearchOptions = {}
     let isActive = true;
 
     debounceHandle.current = window.setTimeout(() => {
+      const cacheKey = `${trimmed.toLowerCase()}::${limit}`;
+      if (cacheRef.current.has(cacheKey)) {
+        setSuggestions(cacheRef.current.get(cacheKey) || []);
+        setError(null);
+        setIsLoading(false);
+        return;
+      }
+
       const searchParams = new URLSearchParams({
         query: trimmed,
         limit: String(limit)
@@ -65,6 +74,7 @@ export function useTraderSearch(query: string, options: TraderSearchOptions = {}
         .then((payload) => {
           if (!isActive) return;
           const entries = Array.isArray(payload?.traders) ? payload.traders : [];
+          cacheRef.current.set(cacheKey, entries);
           setSuggestions(entries);
           setError(payload?.error ?? null);
         })

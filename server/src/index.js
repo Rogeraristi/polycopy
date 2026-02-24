@@ -765,10 +765,17 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
       throw new Error(`Apify leaderboard fetch failed: ${response.status}`);
     }
     const apifyData = await response.json();
-    // Apify returns a flat array, so we use only one period (weekly/all)
+    // Apify often returns a flat snapshot; expose all standard periods for the frontend filter UX.
     const entries = normaliseLeaderboardEntries(apifyData, limit);
-    periods[defaultPeriod] = entries;
-    labels[defaultPeriod] = 'Leaderboard';
+    periods.today = entries;
+    periods.weekly = entries;
+    periods.monthly = entries;
+    periods.all = entries;
+    labels.today = LEADERBOARD_PERIODS.today.label;
+    labels.weekly = LEADERBOARD_PERIODS.weekly.label;
+    labels.monthly = LEADERBOARD_PERIODS.monthly.label;
+    labels.all = LEADERBOARD_PERIODS.all.label;
+    defaultPeriod = LEADERBOARD_DEFAULT_PERIOD;
     fetchedAt = Date.now();
   } catch (error) {
     console.error('Failed to fetch leaderboard from Apify', error);
@@ -782,6 +789,59 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
     fetchedAt,
     source
   };
+}
+
+function searchTradersFromLeaderboardSnapshot(query, limit = 8) {
+  const trimmed = typeof query === 'string' ? query.trim().toLowerCase() : '';
+  if (!trimmed) return [];
+
+  const snapshot = leaderboardCache.snapshot;
+  if (!snapshot || !snapshot.periods || typeof snapshot.periods !== 'object') {
+    return [];
+  }
+
+  const seen = new Set();
+  const results = [];
+  const periods = Object.values(snapshot.periods).filter(Array.isArray);
+
+  for (const bucket of periods) {
+    for (const entry of bucket) {
+      if (!entry || typeof entry !== 'object' || typeof entry.address !== 'string') continue;
+      const address = entry.address.toLowerCase();
+      if (seen.has(address)) continue;
+
+      const displayName = String(entry.displayName || '').toLowerCase();
+      const username = String(entry.username || '').toLowerCase();
+      const pseudonym = String(entry.pseudonym || '').toLowerCase();
+
+      const matches =
+        address.includes(trimmed) ||
+        displayName.includes(trimmed) ||
+        username.includes(trimmed) ||
+        pseudonym.includes(trimmed);
+
+      if (!matches) continue;
+
+      seen.add(address);
+      results.push({
+        address,
+        displayName: entry.displayName || `${address.slice(0, 6)}…${address.slice(-4)}`,
+        rank: Number.isFinite(Number(entry.rank)) ? Number(entry.rank) : results.length + 1,
+        roi: toFiniteNumber(entry.roi),
+        pnl: toFiniteNumber(entry.pnl),
+        volume: toFiniteNumber(entry.volume),
+        trades: toFiniteNumber(entry.trades),
+        avatarUrl: typeof entry.avatarUrl === 'string' ? entry.avatarUrl : null,
+        username: typeof entry.username === 'string' ? entry.username : null,
+        pseudonym: typeof entry.pseudonym === 'string' ? entry.pseudonym : null,
+        displayUsernamePublic:
+          typeof entry.displayUsernamePublic === 'boolean' ? entry.displayUsernamePublic : null
+      });
+      if (results.length >= limit) return results;
+    }
+  }
+
+  return results.slice(0, limit);
 }
 
 function normaliseTraderSearchResults(payload, limit = 8) {
@@ -1250,12 +1310,20 @@ async function searchTraders(query, limit = 8) {
     const payload = await requestTraderSearch(trimmed, limit);
     const traders = normaliseTraderSearchResults(payload, limit);
     const enriched = await enrichWithPortfolioValues(traders);
-    return { traders: enriched, error: null };
+    if (enriched.length > 0) {
+      return { traders: enriched, error: null };
+    }
+    const fallbackFromLeaderboard = searchTradersFromLeaderboardSnapshot(trimmed, limit);
+    return { traders: fallbackFromLeaderboard, error: null };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const authIssue = /invalid token|unauthorised|unauthorized|forbidden|401|403/i.test(message);
     if (!authIssue) {
       console.error('Failed to search traders', message);
+    }
+    const fallbackFromLeaderboard = searchTradersFromLeaderboardSnapshot(trimmed, limit);
+    if (fallbackFromLeaderboard.length > 0) {
+      return { traders: fallbackFromLeaderboard, error: null };
     }
     return {
       traders: [],
