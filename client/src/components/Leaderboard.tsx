@@ -104,6 +104,7 @@ function PodiumCard({
           src={getAvatar(entry)}
           alt={`${entry.displayName} avatar`}
           className={`${emphasized ? 'h-12 w-12' : 'h-10 w-10'} rounded-full object-cover`}
+          loading="lazy"
         />
         <div className="min-w-0">
           <p className={`${emphasized ? 'text-base' : 'text-sm'} truncate font-semibold text-white`}>{entry.displayName}</p>
@@ -312,6 +313,7 @@ export function Leaderboard({
                             src={getAvatar(trader)}
                             alt={`${trader.displayName} avatar`}
                             className="h-8 w-8 rounded-full object-cover"
+                            loading="lazy"
                           />
                           <div>
                             <p className="font-medium text-slate-100">{trader.displayName}</p>

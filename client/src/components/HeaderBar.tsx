@@ -1,4 +1,6 @@
+
 import type { SessionUser } from '../hooks/useSession';
+import MetallicLogo from './MetallicLogo';
 
 interface HeaderBarProps {
   user: SessionUser | null;
@@ -75,7 +77,7 @@ export function HeaderBar({
   return (
     <header className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
-        <img src="/polycopy-logo0.png" alt="PolyCopy Logo" className="h-10 w-10" style={{ background: 'none' }} />
+        <MetallicLogo size={40} />
         <div>
           <p className="text-xs uppercase tracking-[0.35em] text-primary/80">PolyCopy</p>
           <h1 className="text-2xl font-semibold text-slate-100 sm:text-3xl">Mirror elite Polymarket traders</h1>

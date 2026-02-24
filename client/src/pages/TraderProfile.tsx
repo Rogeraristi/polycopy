@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import MetallicLogo from '../components/MetallicLogo';
 import { Link, useParams } from 'react-router-dom';
 import type { Trade } from '../hooks/useLiveTrades';
 import BreakingNewsBanner from '../components/BreakingNewsBanner';
@@ -186,7 +187,7 @@ export default function TraderProfile() {
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/polycopy-logo3.png" alt="PolyCopy Logo" className="h-8 w-8" style={{ background: 'none' }} />
+            <MetallicLogo size={32} />
             <h1 className="text-2xl font-semibold">Trader Profile</h1>
           </div>
           <div className="flex items-center gap-2">

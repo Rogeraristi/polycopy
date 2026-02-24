@@ -128,7 +128,7 @@ export function TradeList({ trades, onCopy, isCopying, canCopy = true }: TradeLi
             <header className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
                 <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-800 bg-slate-900">
-                  <img src={avatar} alt="Trader avatar" className="h-full w-full object-cover" loading="lazy" />
+                  <MetallicLogo size={32} src={avatar} />
                 </span>
                 <div>
                   <p className="text-xs uppercase text-slate-400 tracking-wide">{when}</p>
