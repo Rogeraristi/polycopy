@@ -184,7 +184,10 @@ export default function TraderProfile() {
         </div>
 
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Trader Profile</h1>
+          <div className="flex items-center gap-3">
+            <img src="/polycopy-logo3.png" alt="PolyCopy Logo" className="h-8 w-8" style={{ background: 'none' }} />
+            <h1 className="text-2xl font-semibold">Trader Profile</h1>
+          </div>
           <div className="flex items-center gap-2">
             <Link to="/" className="rounded-full border border-slate-700 px-4 py-2 text-sm hover:border-slate-500">
               Dashboard

@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 601 655">
-  <g>
-    <path d="M150,320 Q150,120 300,120 Q450,120 450,320" fill="none" stroke="#e5e7eb" stroke-width="40"/>
-    <path d="M300,120 Q300,320 300,520" fill="none" stroke="#e5e7eb" stroke-width="40"/>
-    <path d="M200,520 Q250,470 300,520 Q350,470 400,520" fill="none" stroke="#e5e7eb" stroke-width="40"/>
-    <path d="M300,520 Q300,600 300,655" fill="none" stroke="#e5e7eb" stroke-width="40"/>
-  </g>
-</svg>

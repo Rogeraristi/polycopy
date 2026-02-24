@@ -7,6 +7,7 @@ interface HeadlineItem {
   text: string;
   url: string;
   chance: number | null;
+  volume24h?: number | null;
 }
 
 function parseChanceFromMarket(market: any): number | null {
@@ -49,6 +50,7 @@ export default function BreakingNewsBanner() {
   const contentWidthRef = useRef(0);
   const [headlines, setHeadlines] = useState<HeadlineItem[]>([]);
   const [isPaused, setIsPaused] = useState(false);
+  const rotationCursorRef = useRef(0);
 
   // Fetch live markets every 10 seconds
   useEffect(() => {
@@ -58,13 +60,51 @@ export default function BreakingNewsBanner() {
         const res = await fetch(`${API_BASE}/markets`);
         const data = await res.json();
         if (!Array.isArray(data.markets)) return;
-        const formatted = data.markets.slice(0, 12).map((m: any) => {
+
+        // De-duplicate similar market prompts so the ticker feels broader.
+        const uniqueByQuestion = new Map<string, any>();
+        for (const market of data.markets) {
+          const question = String(market?.question || market?.title || '').trim();
+          if (!question) continue;
+          const key = question.toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s%$]/g, '');
+          const existing = uniqueByQuestion.get(key);
+          if (!existing) {
+            uniqueByQuestion.set(key, market);
+            continue;
+          }
+          // Keep the higher-volume variant when duplicates exist.
+          const existingVol = Number(existing?.volume24h || 0);
+          const nextVol = Number(market?.volume24h || 0);
+          if (Number.isFinite(nextVol) && nextVol > existingVol) {
+            uniqueByQuestion.set(key, market);
+          }
+        }
+
+        const uniqueMarkets = Array.from(uniqueByQuestion.values()).sort((a, b) => {
+          const av = Number(a?.volume24h || 0);
+          const bv = Number(b?.volume24h || 0);
+          return bv - av;
+        });
+
+        // Rotate which chunk is displayed each refresh so users see more live variety.
+        const chunkSize = 14;
+        const maxStart = Math.max(0, uniqueMarkets.length - chunkSize);
+        if (maxStart > 0) {
+          rotationCursorRef.current = (rotationCursorRef.current + 4) % (maxStart + 1);
+        } else {
+          rotationCursorRef.current = 0;
+        }
+        const windowed = uniqueMarkets.slice(rotationCursorRef.current, rotationCursorRef.current + chunkSize);
+        const selected = windowed.length > 0 ? windowed : uniqueMarkets.slice(0, chunkSize);
+
+        const formatted = selected.map((m: any) => {
           const chance = parseChanceFromMarket(m);
           const marketPath = m.slug ? `/${m.slug}` : `/market/${m.id}`;
           return {
             text: String(m.question || 'Polymarket market'),
             url: `https://polymarket.com${marketPath}`,
-            chance
+            chance,
+            volume24h: Number.isFinite(Number(m.volume24h)) ? Number(m.volume24h) : null
           };
         });
         if (!cancelled) setHeadlines(formatted);
@@ -139,6 +179,9 @@ export default function BreakingNewsBanner() {
                 <span className={`font-semibold ${h.chance !== null && h.chance >= 50 ? 'text-emerald-200' : 'text-rose-200'}`}>
                   {h.chance === null ? 'N/A chance' : `${Math.round(h.chance)}% chance`}
                 </span>
+                {typeof h.volume24h === 'number' && Number.isFinite(h.volume24h) && (
+                  <span className="text-blue-100/90">${Math.round(h.volume24h).toLocaleString()} 24h vol</span>
+                )}
               </a>
             ))
           )}
