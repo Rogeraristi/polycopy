@@ -161,13 +161,13 @@ export function TraderSearch({
             onBlur={() => setTimeout(() => setIsFocused(false), 120)}
             onKeyDown={handleKeyDown}
             placeholder="Search by wallet or username"
-            className="w-full rounded-2xl border border-[#2b4068] bg-[#0c1730cc] px-5 py-4 text-base text-[#e5efff] placeholder:text-[#6f88b2] focus:border-[#21c4c4] focus:outline-none focus:ring-4 focus:ring-[#21c4c444]"
+            className="w-full rounded-2xl border border-slate-700/70 bg-slate-900/80 px-5 py-4 text-base text-white placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-4 focus:ring-primary/40"
           />
           {showSuggestions && (
-            <div className="absolute left-0 right-0 top-full z-[210] mt-2 overflow-hidden rounded-2xl border border-[#2b4068] bg-[#0b152ae8] shadow-xl shadow-slate-950/40 backdrop-blur">
+            <div className="absolute left-0 right-0 top-full z-[210] mt-2 overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/95 shadow-xl shadow-slate-950/40 backdrop-blur">
               {filteredSuggestions.length > 0 ? (
                 <>
-                  <ul className="divide-y divide-[#26395f]">
+                  <ul className="divide-y divide-slate-800/60">
                     {filteredSuggestions.map((entry, index) => {
                       const isHighlighted = index === highlightedIndex;
                       const isSelected = selectedAddress ? entry.address === selectedAddress : false;
@@ -192,10 +192,10 @@ export function TraderSearch({
                             onClick={() => selectSuggestion(entry)}
                             className={`flex w-full flex-col gap-1 px-4 py-3 text-left transition ${
                               isHighlighted
-                                ? 'bg-[#18345e] text-white'
+                                ? 'bg-primary/15 text-white'
                                 : isSelected
-                                ? 'bg-[#13223d] text-white'
-                                : 'bg-transparent text-[#d8e6ff] hover:bg-[#15233f]'
+                                ? 'bg-slate-900/80 text-white'
+                                : 'bg-transparent text-slate-200 hover:bg-slate-900/60'
                             }`}
                           >
                             <div className="flex items-center justify-between gap-3">
@@ -211,21 +211,20 @@ export function TraderSearch({
                                   </span>
                                 )}
                                 <div className="flex flex-col">
-                                  <span className="text-sm font-medium text-[#e5efff]">{entry.displayName}</span>
+                                  <span className="text-sm font-medium text-slate-200">{entry.displayName}</span>
                                   {usernameLabel && (
-                                    <span className="text-xs text-[#8fa5cb]">@{usernameLabel}</span>
+                                    <span className="text-xs text-slate-400">@{usernameLabel}</span>
                                   )}
                                 </div>
                               </div>
                               <div className="flex flex-col items-end gap-1 text-right">
                                 {rankLabel !== null && (
-                                  <span className="text-xs uppercase tracking-wide text-[#8fa5cb]">#{rankLabel}</span>
+                                  <span className="text-xs uppercase tracking-wide text-slate-400">#{rankLabel}</span>
                                 )}
                                 <span
                                   className={`text-xs font-semibold ${
                                     entry.pnl === null
                                       ? 'text-slate-400'
-                                      
                                       : entry.pnl >= 0
                                       ? 'text-emerald-300'
                                       : 'text-rose-300'
@@ -237,9 +236,9 @@ export function TraderSearch({
                             </div>
                             <div className="flex flex-col gap-0.5">
                               {pseudonymLabel && (
-                                <span className="text-xs text-[#8fa5cb]">AKA {pseudonymLabel}</span>
+                                <span className="text-xs text-slate-400">AKA {pseudonymLabel}</span>
                               )}
-                              <span className="text-xs text-[#6f88b2] break-all">{entry.address}</span>
+                              <span className="text-xs text-slate-500 break-all">{entry.address}</span>
                             </div>
                           </button>
                         </li>
@@ -247,13 +246,13 @@ export function TraderSearch({
                     })}
                   </ul>
                   {searchError && (
-                    <div className="border-t border-[#26395f] px-4 py-2 text-xs text-rose-300">
+                    <div className="border-t border-slate-800/50 px-4 py-2 text-xs text-rose-300">
                       Trader lookup is temporarily unavailable.
                     </div>
                   )}
                 </>
               ) : (
-                <div className="space-y-1 px-4 py-3 text-sm text-[#8fa5cb]">
+                <div className="space-y-1 px-4 py-3 text-sm text-slate-400">
                   <p>
                     {isSearching
                       ? 'Searching traders…'
@@ -273,12 +272,12 @@ export function TraderSearch({
         </div>
         <button
           type="submit"
-          className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-[#21c4c4] to-[#0dd3a8] px-6 py-4 text-sm font-semibold text-[#032021] shadow-lg shadow-[#21c4c444] transition hover:brightness-105"
+          className="inline-flex items-center justify-center rounded-2xl bg-primary px-6 py-4 text-sm font-semibold text-white shadow-lg shadow-primary/20 transition hover:bg-primary/90"
         >
           Track trader
         </button>
       </div>
-      <p className="text-sm text-[#8fa5cb]">Paste a Polymarket wallet or start typing to search for traders.</p>
+      <p className="text-sm text-slate-400">Paste a Polymarket wallet or start typing to search for traders.</p>
     </form>
   );
 }

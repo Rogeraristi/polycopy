@@ -108,7 +108,7 @@ export function TraderDashboard({ address }: { address: string }) {
   const Tooltip = ({ text, children }: { text: string, children: React.ReactNode }) => (
     <span className="relative group cursor-help">
       {children}
-      <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block rounded bg-[#0d1930] px-2 py-1 text-xs text-[#d8e6ff] shadow-lg z-10 whitespace-nowrap">
+      <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 hidden group-hover:block bg-slate-800 text-xs text-slate-100 px-2 py-1 rounded shadow-lg z-10 whitespace-nowrap">
         {text}
       </span>
     </span>
@@ -141,15 +141,15 @@ export function TraderDashboard({ address }: { address: string }) {
 
   // PnL Over Time Chart
   const PnLChart = () => (
-    <div className="mb-4 h-48 w-full rounded border border-[#26395f] bg-[#101c35cc] p-2">
-      <h4 className="mb-1 text-xs text-[#8fa5cb]">PnL Over Time</h4>
+    <div className="w-full h-48 bg-slate-900/60 rounded mb-4 p-2">
+      <h4 className="text-xs text-slate-400 mb-1">PnL Over Time</h4>
       <ResponsiveContainer width="100%" height="90%">
         <LineChart data={pnlChartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2b4068" />
-          <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#8fa5cb' }} />
-          <YAxis tick={{ fontSize: 10, fill: '#8fa5cb' }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+          <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+          <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
           <RechartsTooltip contentStyle={{ background: '#1e293b', border: 'none', color: '#fff' }} />
-          <Line type="monotone" dataKey="pnl" stroke="#21c4c4" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="pnl" stroke="#34d399" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -157,15 +157,15 @@ export function TraderDashboard({ address }: { address: string }) {
 
   // Trade Volume Bar Chart
   const TradeVolumeChart = () => (
-    <div className="mb-4 h-48 w-full rounded border border-[#26395f] bg-[#101c35cc] p-2">
-      <h4 className="mb-1 text-xs text-[#8fa5cb]">Trade Volume Per Day</h4>
+    <div className="w-full h-48 bg-slate-900/60 rounded mb-4 p-2">
+      <h4 className="text-xs text-slate-400 mb-1">Trade Volume Per Day</h4>
       <ResponsiveContainer width="100%" height="90%">
         <BarChart data={tradeVolumeData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#2b4068" />
-          <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#8fa5cb' }} />
-          <YAxis tick={{ fontSize: 10, fill: '#8fa5cb' }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+          <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+          <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
           <RechartsTooltip contentStyle={{ background: '#1e293b', border: 'none', color: '#fff' }} />
-          <Bar dataKey="volume" fill="#0dd3a8" />
+          <Bar dataKey="volume" fill="#60a5fa" />
           <Legend />
         </BarChart>
       </ResponsiveContainer>
@@ -173,40 +173,40 @@ export function TraderDashboard({ address }: { address: string }) {
   );
 
   return (
-    <section className="card mt-6 space-y-10 border border-[#1f2d4d] p-6 shadow-2xl">
-      <h2 className="brand-heading text-lg font-semibold text-white">Trader Dashboard</h2>
-      <p className="mb-4 text-sm text-[#8fa5cb]">Portfolio and PnL for <span className="font-mono">{address}</span></p>
+    <section className="card p-6 space-y-10 mt-6 shadow-2xl border border-slate-800 bg-gradient-to-b from-slate-900/80 to-slate-900/60">
+      <h2 className="text-lg font-semibold text-white">Trader Dashboard</h2>
+      <p className="text-sm text-slate-400 mb-4">Portfolio and PnL for <span className="font-mono">{address}</span></p>
 
       {/* Summary Stats */}
       <div className="flex flex-wrap gap-6 mb-2">
         <Tooltip text="Total realized and unrealized profit/loss">
           <div className="flex flex-col items-center">
             <span className={`text-2xl font-bold ${pnl !== null && pnl < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>{fmt(pnl)}</span>
-            <span className="text-xs text-[#8fa5cb]">Total PnL</span>
+            <span className="text-xs text-slate-400">Total PnL</span>
           </div>
         </Tooltip>
         <Tooltip text="Number of markets with open positions">
           <div className="flex flex-col items-center">
             <span className="text-2xl font-bold">{totalOpenPositions}</span>
-            <span className="text-xs text-[#8fa5cb]">Open Positions</span>
+            <span className="text-xs text-slate-400">Open Positions</span>
           </div>
         </Tooltip>
         <Tooltip text="Current total portfolio value (USD)">
           <div className="flex flex-col items-center">
             <span className="text-2xl font-bold">{fmt(portfolioValue, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })}</span>
-            <span className="text-xs text-[#8fa5cb]">Portfolio Value</span>
+            <span className="text-xs text-slate-400">Portfolio Value</span>
           </div>
         </Tooltip>
         <Tooltip text="Number of open orders">
           <div className="flex flex-col items-center">
             <span className="text-2xl font-bold">{totalOpenOrders}</span>
-            <span className="text-xs text-[#8fa5cb]">Open Orders</span>
+            <span className="text-xs text-slate-400">Open Orders</span>
           </div>
         </Tooltip>
         <Tooltip text="Number of trades in history">
           <div className="flex flex-col items-center">
             <span className="text-2xl font-bold">{totalTrades}</span>
-            <span className="text-xs text-[#8fa5cb]">Trade History</span>
+            <span className="text-xs text-slate-400">Trade History</span>
           </div>
         </Tooltip>
       </div>
@@ -214,15 +214,15 @@ export function TraderDashboard({ address }: { address: string }) {
       <PnLChart />
       <TradeVolumeChart />
 
-      <hr className="my-2 border-[#26395f]" />
+      <hr className="border-slate-800 my-2" />
 
       {/* Open Positions */}
       <div>
-        <h3 className="mb-2 font-semibold text-slate-200">Open Positions</h3>
+        <h3 className="font-semibold text-slate-200 mb-2">Open Positions</h3>
         <div className="overflow-x-auto max-h-64">
           <table className="min-w-full text-sm mb-4 border-separate border-spacing-y-1">
             <thead>
-              <tr className="bg-[#0d1930] text-[#8fa5cb]">
+              <tr className="text-slate-400 bg-slate-800">
                 <th className="px-3 py-2 text-left">Market</th>
                 <th className="px-3 py-2 text-right">Position</th>
                 <th className="px-3 py-2 text-right">PnL</th>
@@ -231,7 +231,7 @@ export function TraderDashboard({ address }: { address: string }) {
             </thead>
             <tbody>
               {openPositions.map((pos: any, i: number) => (
-                <tr key={i} className="text-slate-100 even:bg-[#101c35cc]">
+                <tr key={i} className="text-slate-100 even:bg-slate-900/60">
                   <td className="px-3 py-2">{pos.market}</td>
                   <td className="px-3 py-2 text-right">{pos.position}</td>
                   <td className={`px-3 py-2 text-right font-semibold ${pos.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>{pos.pnl}</td>
@@ -243,15 +243,15 @@ export function TraderDashboard({ address }: { address: string }) {
         </div>
       </div>
 
-      <hr className="my-2 border-[#26395f]" />
+      <hr className="border-slate-800 my-2" />
 
       {/* Open Orders */}
       <div>
-        <h3 className="mb-2 font-semibold text-slate-200">Open Orders</h3>
+        <h3 className="font-semibold text-slate-200 mb-2">Open Orders</h3>
         <div className="overflow-x-auto max-h-64">
           <table className="min-w-full text-sm mb-4 border-separate border-spacing-y-1">
             <thead>
-              <tr className="bg-[#0d1930] text-[#8fa5cb]">
+              <tr className="text-slate-400 bg-slate-800">
                 <th className="px-3 py-2 text-left">Market</th>
                 <th className="px-3 py-2 text-center">Side</th>
                 <th className="px-3 py-2 text-right">Size</th>
@@ -261,10 +261,10 @@ export function TraderDashboard({ address }: { address: string }) {
             </thead>
             <tbody>
               {openOrders.length === 0 ? (
-                <tr><td colSpan={5} className="py-2 text-center text-[#6f88b2]">No open orders</td></tr>
+                <tr><td colSpan={5} className="text-center text-slate-500 py-2">No open orders</td></tr>
               ) : (
                 openOrders.map((order: any, i: number) => (
-                  <tr key={i} className="text-slate-100 even:bg-[#101c35cc]">
+                  <tr key={i} className="text-slate-100 even:bg-slate-900/60">
                     <td className="px-3 py-2">{order.market}</td>
                     <td className="px-3 py-2 text-center">{order.side}</td>
                     <td className="px-3 py-2 text-right">{order.size}</td>
@@ -278,15 +278,15 @@ export function TraderDashboard({ address }: { address: string }) {
         </div>
       </div>
 
-      <hr className="my-2 border-[#26395f]" />
+      <hr className="border-slate-800 my-2" />
 
       {/* Trade History */}
       <div>
-        <h3 className="mb-2 font-semibold text-slate-200">Trade History</h3>
+        <h3 className="font-semibold text-slate-200 mb-2">Trade History</h3>
         <div className="overflow-x-auto max-h-64">
           <table className="min-w-full text-sm border-separate border-spacing-y-1">
             <thead>
-              <tr className="bg-[#0d1930] text-[#8fa5cb]">
+              <tr className="text-slate-400 bg-slate-800">
                 <th className="px-3 py-2 text-left">Date</th>
                 <th className="px-3 py-2 text-left">Market</th>
                 <th className="px-3 py-2 text-center">Side</th>
@@ -297,10 +297,10 @@ export function TraderDashboard({ address }: { address: string }) {
             </thead>
             <tbody>
               {tradeHistory.length === 0 ? (
-                <tr><td colSpan={6} className="py-2 text-center text-[#6f88b2]">No trade history</td></tr>
+                <tr><td colSpan={6} className="text-center text-slate-500 py-2">No trade history</td></tr>
               ) : (
                 tradeHistory.map((trade: any, i: number) => (
-                  <tr key={i} className="text-slate-100 even:bg-[#101c35cc]">
+                  <tr key={i} className="text-slate-100 even:bg-slate-900/60">
                     <td className="px-3 py-2">{typeof trade.date === 'number' ? new Date(trade.date).toLocaleString() : trade.date}</td>
                     <td className="px-3 py-2">{trade.market}</td>
                     <td className="px-3 py-2 text-center">{trade.side}</td>
@@ -315,7 +315,7 @@ export function TraderDashboard({ address }: { address: string }) {
         </div>
       </div>
       {/* TODO: Add charts/visualizations here */}
-      {isLoading && <div className="text-center text-[#8fa5cb]">Loading…</div>}
+      {isLoading && <div className="text-slate-400 text-center">Loading…</div>}
       {error && <div className="text-rose-400 text-center">{error}</div>}
 
     </section>
