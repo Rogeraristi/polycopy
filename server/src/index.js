@@ -618,10 +618,53 @@ async function fetchMarkets() {
   try {
     const payload = await fetchJson(url);
     const data = Array.isArray(payload?.data) ? payload.data : payload;
+    const extractChance = (market) => {
+      const directCandidates = [
+        market?.probability,
+        market?.chance,
+        market?.lastTradePrice,
+        market?.last_price,
+        market?.price
+      ];
+
+      for (const candidate of directCandidates) {
+        const numeric = toFiniteNumber(candidate);
+        if (numeric === null) continue;
+        const normalized = numeric > 1 ? numeric : numeric * 100;
+        if (normalized >= 0 && normalized <= 100) {
+          return Number(normalized.toFixed(2));
+        }
+      }
+
+      const priceBuckets = [market?.outcomePrices, market?.prices];
+      for (const bucket of priceBuckets) {
+        const values =
+          typeof bucket === 'string'
+            ? bucket
+                .split(',')
+                .map((value) => Number(value.trim()))
+                .filter((value) => Number.isFinite(value))
+            : Array.isArray(bucket)
+            ? bucket.map((value) => Number(value)).filter((value) => Number.isFinite(value))
+            : [];
+
+        if (!values.length) continue;
+        const first = values[0];
+        const normalized = first > 1 ? first : first * 100;
+        if (normalized >= 0 && normalized <= 100) {
+          return Number(normalized.toFixed(2));
+        }
+      }
+
+      return null;
+    };
+
     return data.map((market) => ({
       id: market.id || market.slug,
+      slug: market.slug || market.id || null,
       question: market.question || market.title,
       outcomes: market.outcomes || market.outcomeTokens || [],
+      chance: extractChance(market),
       volume24h: Number(market.volume24h || market.volume_24h || 0),
       liquidity: Number(market.liquidity || 0)
     }));

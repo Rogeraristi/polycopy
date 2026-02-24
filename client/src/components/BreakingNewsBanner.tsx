@@ -45,6 +45,8 @@ function parseChanceFromMarket(market: any): number | null {
 
 export default function BreakingNewsBanner() {
   const tickerRef = useRef<HTMLDivElement>(null);
+  const offsetRef = useRef(0);
+  const contentWidthRef = useRef(0);
   const [headlines, setHeadlines] = useState<HeadlineItem[]>([]);
   const [isPaused, setIsPaused] = useState(false);
 
@@ -58,9 +60,10 @@ export default function BreakingNewsBanner() {
         if (!Array.isArray(data.markets)) return;
         const formatted = data.markets.slice(0, 12).map((m: any) => {
           const chance = parseChanceFromMarket(m);
+          const marketPath = m.slug ? `/${m.slug}` : `/market/${m.id}`;
           return {
             text: String(m.question || 'Polymarket market'),
-            url: `https://polymarket.com/market/${m.id}`,
+            url: `https://polymarket.com${marketPath}`,
             chance
           };
         });
@@ -75,29 +78,38 @@ export default function BreakingNewsBanner() {
     };
   }, []);
 
-  // Animate ticker (slower for readability)
+  // Measure one full content cycle width (we render the list twice).
+  useEffect(() => {
+    const ticker = tickerRef.current;
+    if (!ticker) return;
+    const measure = () => {
+      contentWidthRef.current = ticker.scrollWidth / 2;
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [headlines]);
+
+  // Animate ticker with seamless looping + true hover pause.
   useEffect(() => {
     const ticker = tickerRef.current;
     if (!ticker) return;
     let animationId: number;
-    let start = 0;
-    const speed = 0.35;
+    const speed = 0.18;
+
     function animate() {
       if (!ticker) return;
       if (!isPaused) {
-        start -= speed;
-      }
-      if (ticker.scrollWidth + start < 0) {
-        const parent = ticker.parentElement;
-        if (parent) {
-          start = parent.offsetWidth;
-        } else {
-          start = 0;
+        offsetRef.current -= speed;
+        const loopWidth = contentWidthRef.current;
+        if (loopWidth > 0 && Math.abs(offsetRef.current) >= loopWidth) {
+          offsetRef.current += loopWidth;
         }
+        ticker.style.transform = `translateX(${offsetRef.current}px)`;
       }
-      ticker.style.transform = `translateX(${start}px)`;
       animationId = requestAnimationFrame(animate);
     }
+
     animate();
     return () => cancelAnimationFrame(animationId);
   }, [headlines, isPaused]);
@@ -115,20 +127,18 @@ export default function BreakingNewsBanner() {
           {headlines.length === 0 ? (
             <span className="opacity-70">Loading markets…</span>
           ) : (
-            headlines.map((h, i) => (
+            [...headlines, ...headlines].map((h, i) => (
               <a
-                key={i}
+                key={`${h.url}-${i}`}
                 href={h.url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 hover:underline hover:text-yellow-200 transition-colors"
               >
                 <span>{h.text}</span>
-                {h.chance !== null && (
-                  <span className={`font-semibold ${h.chance >= 50 ? 'text-emerald-200' : 'text-rose-200'}`}>
-                    {h.chance}% chance
-                  </span>
-                )}
+                <span className={`font-semibold ${h.chance !== null && h.chance >= 50 ? 'text-emerald-200' : 'text-rose-200'}`}>
+                  {h.chance === null ? 'N/A chance' : `${Math.round(h.chance)}% chance`}
+                </span>
               </a>
             ))
           )}
