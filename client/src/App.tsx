@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BrowserRouter as Router, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { HashRouter as Router, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { Leaderboard, type LeaderboardEntry } from './components/Leaderboard';
 import BreakingNewsBanner from './components/BreakingNewsBanner';
 import { TraderDashboard } from './components/TraderDashboard';
@@ -432,11 +432,11 @@ function HomePage() {
           <p className="inline-flex rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-blue-200">
             Polymarket Intelligence
           </p>
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-6">
+            <MetallicLogo size={115} animated />
             <h1 className="max-w-4xl text-2xl font-semibold leading-tight text-white sm:text-4xl">
               Discover top traders and track your own portfolio with confidence
             </h1>
-            <MetallicLogo size={64} animated />
           </div>
           <p className="mx-auto max-w-2xl text-base text-slate-300 sm:text-lg">
             Track your own portfolio and analyze other traders before deciding who to follow.
