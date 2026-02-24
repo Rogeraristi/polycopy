@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ethers } from 'ethers';
 // Dummy Polymarket contract address and ABI for demonstration
 const POLYMARKET_CONTRACT_ADDRESS = '0x0000000000000000000000000000000000000000'; // TODO: Replace with real address
@@ -36,6 +36,8 @@ interface CopyTradeResult {
 }
 
 export default function App() {
+  // Ref for TraderDashboard
+  const dashboardRef = useRef<HTMLDivElement | null>(null);
   const [inputAddress, setInputAddress] = useState('');
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
   const [leaderboardPeriods, setLeaderboardPeriods] = useState<Record<string, LeaderboardEntry[]>>({});
@@ -176,12 +178,16 @@ export default function App() {
   }, []);
 
   const applySelectedAddress = useCallback(
-    (address: string) => {
+    (address: string, scrollToDashboard?: boolean) => {
       const sanitized = address.trim().toLowerCase();
       const nextAddress = sanitized || null;
       setSelectedAddress(nextAddress);
       setCopyResult(null);
       setCopyError(null);
+      if (scrollToDashboard && dashboardRef.current) {
+        // Use smooth scroll
+        dashboardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
     },
     [setSelectedAddress, setCopyResult, setCopyError]
   );
@@ -347,7 +353,9 @@ export default function App() {
 
         {/* Trader Dashboard visualization */}
         {selectedAddress && (
-          <TraderDashboard address={selectedAddress} />
+          <div ref={dashboardRef}>
+            <TraderDashboard address={selectedAddress} />
+          </div>
         )}
 
         <Leaderboard
@@ -357,7 +365,7 @@ export default function App() {
           onSelect={(address) => {
             const sanitized = address.trim().toLowerCase();
             setInputAddress(sanitized);
-            applySelectedAddress(sanitized);
+            applySelectedAddress(sanitized, true); // scroll to dashboard
           }}
           selectedAddress={selectedAddress}
           periodOptions={periodOptions}
