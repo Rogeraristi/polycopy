@@ -59,6 +59,8 @@ const FEATURE_REAL_COPY_EXECUTION = ['1', 'true', 'yes', 'on'].includes(
 const COPY_EXECUTION_MODE = (process.env.COPY_EXECUTION_MODE || 'webhook').toLowerCase();
 const COPY_EXECUTOR_WEBHOOK_URL = process.env.COPY_EXECUTOR_WEBHOOK_URL || '';
 const COPY_EXECUTOR_WEBHOOK_AUTH_TOKEN = process.env.COPY_EXECUTOR_WEBHOOK_AUTH_TOKEN || '';
+const NEWS_API_KEY = process.env.NEWS_API_KEY || '';
+const NEWS_API_URL = process.env.NEWS_API_URL || 'https://newsapi.org/v2/top-headlines';
 
 const FALLBACK_CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || 'http://localhost:5173';
 const ADDITIONAL_CLIENT_ORIGINS =
@@ -125,6 +127,11 @@ const LEADERBOARD_FIRESTORE_TTL_MS = Number.isFinite(Number(process.env.LEADERBO
 const leaderboardCache = {
   expiresAt: 0,
   snapshot: null
+};
+
+const breakingNewsCache = {
+  expiresAt: 0,
+  payload: null
 };
 
 const FIRESTORE_LEADERBOARD_COLLECTION =
@@ -610,14 +617,42 @@ async function fetchUserTrades(address) {
 }
 
 async function fetchMarkets() {
-  const params = new URLSearchParams({
-    limit: '50',
-    closed: 'false'
-  });
-  const url = `${POLYMARKET_BASE}/markets?${params.toString()}`;
+  const buildUrl = (params) => `${POLYMARKET_BASE}/markets?${new URLSearchParams(params).toString()}`;
+  const urls = [
+    buildUrl({ limit: '150', closed: 'false', active: 'true', archived: 'false' }),
+    buildUrl({ limit: '150', closed: 'false', active: 'true', archived: 'false', order: 'volume24hr', ascending: 'false' })
+  ];
   try {
-    const payload = await fetchJson(url);
-    const data = Array.isArray(payload?.data) ? payload.data : payload;
+    const payloads = await Promise.all(
+      urls.map(async (url) => {
+        try {
+          return await fetchJson(url);
+        } catch (error) {
+          console.error('Failed to fetch markets from source', url, error.message);
+          return [];
+        }
+      })
+    );
+    const data = payloads
+      .flatMap((payload) => (Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : []))
+      .filter(Boolean);
+
+    const parseStringOrArray = (value) => {
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return value
+            .split(',')
+            .map((entry) => entry.trim().replace(/^"|"$/g, ''))
+            .filter(Boolean);
+        }
+      }
+      return [];
+    };
+
     const extractChance = (market) => {
       const directCandidates = [
         market?.probability,
@@ -659,19 +694,340 @@ async function fetchMarkets() {
       return null;
     };
 
-    return data.map((market) => ({
-      id: market.id || market.slug,
-      slug: market.slug || market.id || null,
-      question: market.question || market.title,
-      outcomes: market.outcomes || market.outcomeTokens || [],
-      chance: extractChance(market),
-      volume24h: Number(market.volume24h || market.volume_24h || 0),
-      liquidity: Number(market.liquidity || 0)
-    }));
+    const mapped = data.map((market) => {
+      const outcomes = parseStringOrArray(market.outcomes || market.outcomeTokens || []);
+      const outcomePrices = parseStringOrArray(market.outcomePrices || market.prices || []).map((value) => Number(value));
+
+      const event = Array.isArray(market.events) && market.events.length > 0 ? market.events[0] : null;
+      const eventSlug = event?.slug || null;
+      const eventTitle = event?.title || null;
+
+      let primaryOutcome = null;
+      let primaryOutcomeChance = null;
+      if (outcomes.length > 0 && outcomePrices.length > 0) {
+        let topIndex = 0;
+        let topValue = -Infinity;
+        outcomePrices.forEach((price, index) => {
+          const value = Number(price);
+          if (Number.isFinite(value) && value > topValue) {
+            topValue = value;
+            topIndex = index;
+          }
+        });
+        if (topValue >= 0) {
+          primaryOutcome = String(outcomes[topIndex] ?? outcomes[0] ?? '').trim() || null;
+          const normalized = topValue > 1 ? topValue : topValue * 100;
+          if (normalized >= 0 && normalized <= 100) {
+            primaryOutcomeChance = Number(normalized.toFixed(2));
+          }
+        }
+      }
+
+      const slug = market.slug || market.id || null;
+      const canonicalUrl = eventSlug
+        ? `https://polymarket.com/event/${eventSlug}`
+        : slug
+        ? `https://polymarket.com/event/${slug}`
+        : `https://polymarket.com/market/${market.id}`;
+
+      return {
+        id: market.id || slug,
+        slug,
+        question: market.question || market.title,
+        outcomes,
+        chance: extractChance(market),
+        primaryOutcome,
+        primaryOutcomeChance,
+        volume24h: Number(market.volume24h || market.volume_24h || 0),
+        eventVolume24h: Number(event?.volume24hr || event?.volume24h || 0),
+        liquidity: Number(market.liquidity || 0),
+        eventTitle,
+        eventSlug,
+        updatedAt: market.updatedAt || event?.updatedAt || null,
+        url: canonicalUrl
+      };
+    });
+
+    // Deduplicate noisy duplicates from multiple source requests.
+    const deduped = new Map();
+    for (const market of mapped) {
+      const key = String(market.id || market.slug || market.question || '').toLowerCase();
+      if (!key) continue;
+      const existing = deduped.get(key);
+      if (!existing || Number(market.volume24h || 0) > Number(existing.volume24h || 0)) {
+        deduped.set(key, market);
+      }
+    }
+
+    return Array.from(deduped.values()).sort((a, b) => Number(b.volume24h || 0) - Number(a.volume24h || 0)).slice(0, 120);
   } catch (error) {
     console.error('Failed to fetch markets', error.message);
     return [];
   }
+}
+
+function decodeHtmlEntities(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function stripTags(value) {
+  return String(value || '').replace(/<[^>]*>/g, '').trim();
+}
+
+function tokenizeText(value) {
+  const stopWords = new Set([
+    'the',
+    'and',
+    'for',
+    'with',
+    'that',
+    'this',
+    'will',
+    'from',
+    'into',
+    'over',
+    'under',
+    'about',
+    'after',
+    'before',
+    'what',
+    'when',
+    'where',
+    'which',
+    'whose',
+    'while',
+    'their',
+    'there',
+    'they',
+    'them',
+    'have',
+    'has',
+    'had',
+    'was',
+    'were',
+    'are',
+    'is',
+    'you',
+    'your',
+    'more',
+    'less',
+    'than',
+    'new',
+    'top',
+    'news',
+    'live'
+  ]);
+
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length > 2 && !stopWords.has(token));
+}
+
+function scoreTextOverlap(a, b) {
+  const tokensA = tokenizeText(a);
+  const tokensB = new Set(tokenizeText(b));
+  if (!tokensA.length || !tokensB.size) return 0;
+  let hits = 0;
+  for (const token of tokensA) {
+    if (tokensB.has(token)) hits += 1;
+  }
+  return hits;
+}
+
+async function fetchTopHeadlines(limit = 25) {
+  const safeLimit = Math.max(5, Math.min(50, Number(limit) || 25));
+
+  // Prefer NewsAPI if key exists.
+  if (NEWS_API_KEY) {
+    const params = new URLSearchParams({
+      country: 'us',
+      pageSize: String(safeLimit),
+      apiKey: NEWS_API_KEY
+    });
+    const url = `${NEWS_API_URL}?${params.toString()}`;
+    try {
+      const payload = await fetchJson(url);
+      const articles = Array.isArray(payload?.articles) ? payload.articles : [];
+      return articles
+        .map((article) => ({
+          title: String(article?.title || '').trim(),
+          url: typeof article?.url === 'string' ? article.url : null,
+          source: article?.source?.name || null,
+          publishedAt: article?.publishedAt || null
+        }))
+        .filter((article) => article.title && article.url)
+        .slice(0, safeLimit);
+    } catch (error) {
+      console.error('Failed to fetch top headlines from NewsAPI', error.message);
+    }
+  }
+
+  // Fallback: Google News RSS (no API key required).
+  try {
+    const response = await fetch('https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en', {
+      headers: {
+        'User-Agent': POLYMARKET_DATA_API_USER_AGENT
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`RSS fetch failed (${response.status})`);
+    }
+    const xml = await response.text();
+    const itemMatches = xml.match(/<item>[\s\S]*?<\/item>/g) || [];
+    const headlines = itemMatches
+      .map((item) => {
+        const titleMatch = item.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>|<title>([\s\S]*?)<\/title>/i);
+        const linkMatch = item.match(/<link>([\s\S]*?)<\/link>/i);
+        const pubDateMatch = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/i);
+        const sourceMatch = item.match(/<source[^>]*>([\s\S]*?)<\/source>/i);
+        const title = decodeHtmlEntities(stripTags(titleMatch?.[1] || titleMatch?.[2] || ''));
+        const url = decodeHtmlEntities((linkMatch?.[1] || '').trim());
+        return {
+          title,
+          url: url || null,
+          source: decodeHtmlEntities(stripTags(sourceMatch?.[1] || '')) || 'Google News',
+          publishedAt: pubDateMatch?.[1] || null
+        };
+      })
+      .filter((headline) => headline.title && headline.url)
+      .slice(0, safeLimit);
+    return headlines;
+  } catch (error) {
+    console.error('Failed to fetch top headlines from RSS', error.message);
+    return [];
+  }
+}
+
+function buildBreakingNewsStories(markets, limit = 16) {
+  const groupedByEvent = new Map();
+
+  for (const market of Array.isArray(markets) ? markets : []) {
+    const eventKey = String(market?.eventSlug || market?.eventTitle || market?.slug || market?.id || '').trim().toLowerCase();
+    if (!eventKey) continue;
+
+    const chance =
+      toFiniteNumber(market?.primaryOutcomeChance) ??
+      toFiniteNumber(market?.chance) ??
+      null;
+    if (chance === null || chance < 0 || chance > 100) continue;
+
+    const volume24h = toFiniteNumber(market?.volume24h) ?? 0;
+    const eventVolume24h = toFiniteNumber(market?.eventVolume24h) ?? 0;
+    const score = Math.max(volume24h, eventVolume24h);
+
+    const existing = groupedByEvent.get(eventKey);
+    if (!existing) {
+      groupedByEvent.set(eventKey, {
+        eventKey,
+        title: String(market?.eventTitle || market?.question || 'Polymarket'),
+        eventSlug: market?.eventSlug || market?.slug || null,
+        url:
+          (typeof market?.url === 'string' && market.url) ||
+          (market?.eventSlug ? `https://polymarket.com/event/${market.eventSlug}` : null) ||
+          (market?.slug ? `https://polymarket.com/event/${market.slug}` : null) ||
+          `https://polymarket.com/market/${market?.id}`,
+        chance: Number(chance.toFixed(2)),
+        outcomeLabel: market?.primaryOutcome || null,
+        marketQuestion: market?.question || null,
+        volume24h: score,
+        updatedAt: market?.updatedAt || null
+      });
+      continue;
+    }
+
+    // Keep the highest-volume market representation for each event.
+    if (score > existing.volume24h) {
+      groupedByEvent.set(eventKey, {
+        ...existing,
+        chance: Number(chance.toFixed(2)),
+        outcomeLabel: market?.primaryOutcome || existing.outcomeLabel,
+        marketQuestion: market?.question || existing.marketQuestion,
+        volume24h: score,
+        updatedAt: market?.updatedAt || existing.updatedAt,
+        url:
+          (typeof market?.url === 'string' && market.url) ||
+          existing.url
+      });
+    }
+  }
+
+  return Array.from(groupedByEvent.values())
+    .sort((a, b) => b.volume24h - a.volume24h)
+    .slice(0, Math.max(1, limit))
+    .map((story) => ({
+      title: story.title,
+      question: story.marketQuestion || story.title,
+      url: story.url,
+      chance: story.chance,
+      outcomeLabel: story.outcomeLabel,
+      volume24h: story.volume24h,
+      updatedAt: story.updatedAt
+    }));
+}
+
+function buildHeadlineMappedStories(markets, headlines, limit = 10) {
+  const mapped = [];
+  const usedEventKeys = new Set();
+
+  for (const headline of headlines) {
+    let bestMarket = null;
+    let bestScore = 0;
+
+    for (const market of markets) {
+      const marketText = `${market?.eventTitle || ''} ${market?.question || ''}`;
+      const score = scoreTextOverlap(headline.title, marketText);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMarket = market;
+      }
+    }
+
+    if (!bestMarket || bestScore < 2) {
+      continue;
+    }
+
+    const eventKey = String(bestMarket?.eventSlug || bestMarket?.eventTitle || bestMarket?.slug || bestMarket?.id || '').toLowerCase();
+    if (eventKey && usedEventKeys.has(eventKey)) {
+      continue;
+    }
+    if (eventKey) usedEventKeys.add(eventKey);
+
+    const chance =
+      toFiniteNumber(bestMarket?.primaryOutcomeChance) ??
+      toFiniteNumber(bestMarket?.chance) ??
+      null;
+    if (chance === null) continue;
+
+    mapped.push({
+      title: headline.title,
+      question: bestMarket?.question || headline.title,
+      url:
+        (typeof bestMarket?.url === 'string' && bestMarket.url) ||
+        (bestMarket?.eventSlug ? `https://polymarket.com/event/${bestMarket.eventSlug}` : null) ||
+        (bestMarket?.slug ? `https://polymarket.com/event/${bestMarket.slug}` : null) ||
+        `https://polymarket.com/market/${bestMarket?.id}`,
+      chance: Number(chance.toFixed(2)),
+      outcomeLabel: bestMarket?.primaryOutcome || null,
+      volume24h: Number(bestMarket?.volume24h || 0),
+      updatedAt: bestMarket?.updatedAt || headline.publishedAt || null,
+      source: headline.source || 'News'
+    });
+
+    if (mapped.length >= limit) {
+      break;
+    }
+  }
+
+  return mapped;
 }
 
 function toFiniteNumber(value) {
@@ -1380,6 +1736,38 @@ async function searchTraders(query, limit = 8) {
 app.get('/api/markets', async (_req, res) => {
   const markets = await fetchMarkets();
   res.json({ markets });
+});
+
+app.get('/api/breaking-news', async (req, res) => {
+  const requestedLimit = Number(req.query?.limit);
+  const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(30, requestedLimit)) : 16;
+  const now = Date.now();
+  if (breakingNewsCache.payload && breakingNewsCache.expiresAt > now) {
+    return res.json(breakingNewsCache.payload);
+  }
+
+  const markets = await fetchMarkets();
+  const headlines = await fetchTopHeadlines(30);
+  const headlineMappedStories = buildHeadlineMappedStories(markets, headlines, Math.min(limit, 10));
+  const marketOnlyStories = buildBreakingNewsStories(markets, limit * 2);
+
+  const combined = [...headlineMappedStories];
+  const seenUrls = new Set(combined.map((story) => story.url));
+  for (const story of marketOnlyStories) {
+    if (combined.length >= limit) break;
+    if (!story?.url || seenUrls.has(story.url)) continue;
+    seenUrls.add(story.url);
+    combined.push(story);
+  }
+
+  const payload = {
+    stories: combined.slice(0, limit),
+    fetchedAt: new Date().toISOString()
+  };
+  breakingNewsCache.expiresAt = now + 30_000;
+  breakingNewsCache.payload = payload;
+
+  res.json(payload);
 });
 
 app.get('/api/users/:address/trades', async (req, res) => {

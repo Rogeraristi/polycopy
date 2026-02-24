@@ -7,7 +7,11 @@ interface HeadlineItem {
   text: string;
   url: string;
   chance: number | null;
+  outcomeLabel?: string | null;
+  updatedAt?: string | null;
   volume24h?: number | null;
+  eventKey?: string | null;
+  source?: string | null;
 }
 
 function parseChanceFromMarket(market: any): number | null {
@@ -52,30 +56,32 @@ export default function BreakingNewsBanner() {
   const [isPaused, setIsPaused] = useState(false);
   const rotationCursorRef = useRef(0);
 
-  // Fetch live markets every 10 seconds
+  // Fetch live markets every 8 seconds
   useEffect(() => {
     let cancelled = false;
     async function fetchMarkets() {
       try {
-        const res = await fetch(`${API_BASE}/markets`);
+        const res = await fetch(`${API_BASE}/breaking-news?limit=18`);
         const data = await res.json();
-        if (!Array.isArray(data.markets)) return;
+        if (!Array.isArray(data.stories)) return;
 
-        // De-duplicate similar market prompts so the ticker feels broader.
+        // De-duplicate + limit repeats from the same event.
         const uniqueByQuestion = new Map<string, any>();
-        for (const market of data.markets) {
-          const question = String(market?.question || market?.title || '').trim();
+        const eventCounts = new Map<string, number>();
+        for (const market of data.stories) {
+          const question = String(market?.title || market?.question || '').trim();
           if (!question) continue;
+
+          const eventKey = String(market?.eventSlug || market?.eventTitle || '').trim().toLowerCase();
+          if (eventKey) {
+            const eventCount = eventCounts.get(eventKey) || 0;
+            if (eventCount >= 2) continue;
+            eventCounts.set(eventKey, eventCount + 1);
+          }
+
           const key = question.toLowerCase().replace(/\s+/g, ' ').replace(/[^\w\s%$]/g, '');
           const existing = uniqueByQuestion.get(key);
-          if (!existing) {
-            uniqueByQuestion.set(key, market);
-            continue;
-          }
-          // Keep the higher-volume variant when duplicates exist.
-          const existingVol = Number(existing?.volume24h || 0);
-          const nextVol = Number(market?.volume24h || 0);
-          if (Number.isFinite(nextVol) && nextVol > existingVol) {
+          if (!existing || Number(market?.volume24h || 0) > Number(existing?.volume24h || 0)) {
             uniqueByQuestion.set(key, market);
           }
         }
@@ -87,7 +93,7 @@ export default function BreakingNewsBanner() {
         });
 
         // Rotate which chunk is displayed each refresh so users see more live variety.
-        const chunkSize = 14;
+        const chunkSize = 16;
         const maxStart = Math.max(0, uniqueMarkets.length - chunkSize);
         if (maxStart > 0) {
           rotationCursorRef.current = (rotationCursorRef.current + 4) % (maxStart + 1);
@@ -98,20 +104,31 @@ export default function BreakingNewsBanner() {
         const selected = windowed.length > 0 ? windowed : uniqueMarkets.slice(0, chunkSize);
 
         const formatted = selected.map((m: any) => {
-          const chance = parseChanceFromMarket(m);
-          const marketPath = m.slug ? `/${m.slug}` : `/market/${m.id}`;
+          const chance = parseChanceFromMarket(m) ?? (Number.isFinite(Number(m?.chance)) ? Number(m.chance) : null);
+          const outcomeText = typeof m?.outcomeLabel === 'string' && m.outcomeLabel.trim().length > 0 ? m.outcomeLabel.trim() : null;
+          const resolvedUrl =
+            typeof m?.url === 'string' && /^https?:\/\//.test(m.url)
+              ? m.url
+              : m?.eventSlug
+              ? `https://polymarket.com/event/${m.eventSlug}`
+              : m?.slug
+              ? `https://polymarket.com/event/${m.slug}`
+              : `https://polymarket.com/market/${m.id}`;
+
           return {
-            text: String(m.question || 'Polymarket market'),
-            url: `https://polymarket.com${marketPath}`,
+            text: String(m.title || m.question || 'Polymarket market'),
+            url: resolvedUrl,
             chance,
-            volume24h: Number.isFinite(Number(m.volume24h)) ? Number(m.volume24h) : null
+            outcomeLabel: outcomeText ? `${outcomeText}${chance !== null ? ` ${Math.round(chance)}%` : ''}` : null,
+            volume24h: Number.isFinite(Number(m.volume24h)) ? Number(m.volume24h) : null,
+            source: typeof m?.source === 'string' ? m.source : null
           };
         });
         if (!cancelled) setHeadlines(formatted);
       } catch {}
     }
     fetchMarkets();
-    const interval = setInterval(fetchMarkets, 10000);
+    const interval = setInterval(fetchMarkets, 8000);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -160,7 +177,7 @@ export default function BreakingNewsBanner() {
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      <img src="/fire.svg" alt="Breaking News" className="h-5 w-5 mr-2 animate-pulse" />
+      <span className="mr-2 inline-block h-2 w-2 rounded-full bg-white/90 shadow-[0_0_8px_rgba(255,255,255,0.7)]" />
       <span className="font-bold uppercase tracking-widest mr-4">Breaking News</span>
       <div className="flex-1 overflow-hidden">
         <div ref={tickerRef} className="whitespace-nowrap flex gap-8 text-sm font-medium" style={{ willChange: 'transform' }}>
@@ -175,10 +192,13 @@ export default function BreakingNewsBanner() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 hover:underline hover:text-yellow-200 transition-colors"
               >
+                <span className="text-white">LIVE</span>
                 <span>{h.text}</span>
+                {h.source && <span className="text-white/80">[{h.source}]</span>}
                 <span className={`font-semibold ${h.chance !== null && h.chance >= 50 ? 'text-emerald-200' : 'text-rose-200'}`}>
                   {h.chance === null ? 'N/A chance' : `${Math.round(h.chance)}% chance`}
                 </span>
+                {h.outcomeLabel && <span className="text-amber-100/95">{h.outcomeLabel}</span>}
                 {typeof h.volume24h === 'number' && Number.isFinite(h.volume24h) && (
                   <span className="text-blue-100/90">${Math.round(h.volume24h).toLocaleString()} 24h vol</span>
                 )}

@@ -51,7 +51,7 @@ function createProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: st
   return program;
 }
 
-export default function MetallicLogo({ src = '/polycopy-logo0.png', size = 64 }) {
+export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const shouldAnimateRef = useRef(true);
