@@ -16,3 +16,30 @@ body {
 .card {
   @apply bg-slate-900/70 border border-slate-700/60 backdrop-blur rounded-2xl shadow-lg shadow-slate-950/40;
 }
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.reveal {
+  animation: riseIn 380ms ease-out both;
+}
+
+.reveal-1 {
+  animation-delay: 80ms;
+}
+
+.reveal-2 {
+  animation-delay: 140ms;
+}
+
+.reveal-3 {
+  animation-delay: 200ms;
+}

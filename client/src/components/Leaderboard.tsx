@@ -50,6 +50,79 @@ function formatNumber(value: number | null) {
   return value.toLocaleString();
 }
 
+function getTrophy(rank: number) {
+  if (rank === 1) return '🥇';
+  if (rank === 2) return '🥈';
+  if (rank === 3) return '🥉';
+  return '🏅';
+}
+
+function getAvatar(entry: LeaderboardEntry) {
+  if (entry.avatarUrl) return entry.avatarUrl;
+  const address = entry.address || '';
+  const color = `hsl(${address.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360}, 70%, 55%)`;
+  const initials = address.slice(2, 4).toUpperCase();
+  const svg = `<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'>
+    <circle cx='32' cy='32' r='30' fill='${color}' stroke='white' stroke-width='4'/>
+    <text x='50%' y='54%' text-anchor='middle' font-size='28' font-family='Inter,Arial,sans-serif' font-weight='bold' fill='#fff' dy='.3em'>${initials}</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${btoa(svg.replace(/\n\s+/g, ''))}`;
+}
+
+function PodiumCard({
+  entry,
+  onSelect,
+  emphasized = false,
+  compact = false
+}: {
+  entry: LeaderboardEntry;
+  onSelect: (address: string) => void;
+  emphasized?: boolean;
+  compact?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(entry.address)}
+      className={`w-full rounded-2xl border p-4 text-left transition ${
+        emphasized
+          ? 'border-amber-300/50 bg-gradient-to-b from-amber-500/15 to-slate-900/80 shadow-lg shadow-amber-500/20'
+          : compact
+          ? 'border-slate-700/70 bg-slate-900/80 hover:border-slate-500'
+          : 'border-slate-700/70 bg-slate-900/70 hover:border-slate-500'
+      }`}
+    >
+      <div className="flex items-center justify-between">
+        <span className={`${emphasized ? 'text-3xl' : 'text-2xl'}`}>{getTrophy(entry.rank)}</span>
+        <span className={`text-xs ${emphasized ? 'text-amber-200' : 'text-slate-300'}`}>Rank #{entry.rank}</span>
+      </div>
+      <div className="mt-3 flex items-center gap-3">
+        <img
+          src={getAvatar(entry)}
+          alt={`${entry.displayName} avatar`}
+          className={`${emphasized ? 'h-12 w-12' : 'h-10 w-10'} rounded-full object-cover`}
+        />
+        <div className="min-w-0">
+          <p className={`${emphasized ? 'text-base' : 'text-sm'} truncate font-semibold text-white`}>{entry.displayName}</p>
+          <p className="truncate text-xs text-slate-400">{entry.address}</p>
+        </div>
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <dt className="text-slate-400">ROI</dt>
+          <dd className={`${entry.roi !== null && entry.roi >= 0 ? 'text-emerald-300' : 'text-rose-300'} font-semibold`}>
+            {formatPercent(entry.roi)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-slate-400">P&L</dt>
+          <dd className="font-semibold text-slate-100">{formatUsd(entry.pnl)}</dd>
+        </div>
+      </dl>
+    </button>
+  );
+}
+
 export function Leaderboard({
   entries,
   onSelect,
@@ -61,35 +134,48 @@ export function Leaderboard({
   onPeriodChange
 }: LeaderboardProps) {
   const hasEntries = entries.length > 0;
-  const activePeriodLabel = periodOptions.find((option) => option.key === selectedPeriod)?.label ?? null;
   const hasPeriodControls = periodOptions.length > 0;
 
-  // Fallback avatar
-  // Generate a simple base64 SVG avatar as fallback
-  function generateAvatar(address: string) {
-    const color = `hsl(${address.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360}, 70%, 55%)`;
-    const initials = address.slice(2, 4).toUpperCase();
-    const svg = `<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'>
-      <defs>
-        <filter id='shadow' x='-20%' y='-20%' width='140%' height='140%'>
-          <feDropShadow dx='0' dy='2' stdDeviation='2' flood-color='#000' flood-opacity='0.18'/>
-        </filter>
-      </defs>
-      <circle cx='32' cy='32' r='30' fill='${color}' stroke='white' stroke-width='4' filter='url(#shadow)'/>
-      <text x='50%' y='54%' text-anchor='middle' font-size='28' font-family='Inter,Arial,sans-serif' font-weight='bold' fill='#fff' dy='.3em'>${initials}</text>
-    </svg>`;
-    return `data:image/svg+xml;base64,${btoa(svg.replace(/\n\s+/g, ''))}`;
+  const sorted = [...entries].sort((a, b) => a.rank - b.rank);
+  const first = sorted.find((entry) => entry.rank === 1) || sorted[0] || null;
+  const second = sorted.find((entry) => entry.rank === 2) || sorted[1] || null;
+  const third = sorted.find((entry) => entry.rank === 3) || sorted[2] || null;
+  const rest = sorted.filter((entry) => ![first?.address, second?.address, third?.address].includes(entry.address));
+
+  if (isLoading) {
+    return (
+      <section className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="h-8 w-56 animate-pulse rounded bg-slate-800/80" />
+          <div className="h-8 w-40 animate-pulse rounded-full bg-slate-800/80" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="h-44 animate-pulse rounded-2xl border border-slate-800/70 bg-slate-900/60" />
+          <div className="h-52 animate-pulse rounded-2xl border border-slate-800/70 bg-slate-900/60" />
+          <div className="h-44 animate-pulse rounded-2xl border border-slate-800/70 bg-slate-900/60" />
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/50">
+          <div className="grid grid-cols-6 gap-2 border-b border-slate-800/60 p-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={`s-head-${i}`} className="h-3 animate-pulse rounded bg-slate-800/80" />
+            ))}
+          </div>
+          <div className="space-y-3 p-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={`s-row-${i}`} className="h-8 animate-pulse rounded bg-slate-800/60" />
+            ))}
+          </div>
+        </div>
+      </section>
+    );
   }
+
   return (
-    <section className="card p-6 space-y-4">
+    <section className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold text-white">Top Polymarket traders</h2>
-          <p className="text-sm text-slate-400">
-            {activePeriodLabel
-              ? `${activePeriodLabel} performance snapshot. Select one to start mirroring instantly.`
-              : 'Shortcut into the wallets with the strongest performance. Select one to start mirroring instantly.'}
-          </p>
+          <h2 className="text-2xl font-semibold text-white">Top Polymarket traders</h2>
+          <p className="text-sm text-slate-400">Click any trader to open their profile and inspect full metrics.</p>
         </div>
         {hasPeriodControls && (
           <nav className="flex shrink-0 items-center gap-1 rounded-full border border-slate-800/60 bg-slate-900/60 p-1 text-xs font-medium text-slate-300">
@@ -106,7 +192,7 @@ export function Leaderboard({
                   }}
                   aria-pressed={isActive}
                   className={`rounded-full px-3 py-1 transition ${
-                    isActive ? 'bg-primary text-white shadow shadow-primary/30' : 'hover:bg-slate-800/70'
+                    isActive ? 'bg-blue-600 text-white shadow shadow-blue-500/30' : 'hover:bg-slate-800/70'
                   }`}
                 >
                   {option.label}
@@ -117,81 +203,72 @@ export function Leaderboard({
         )}
       </header>
 
-      {isLoading && (
-        <p className="text-sm text-slate-400">
-          Loading {activePeriodLabel ? `${activePeriodLabel.toLowerCase()} leaderboard…` : 'leaderboard…'}
-        </p>
-      )}
       {!isLoading && error && <p className="text-sm text-rose-300">{error}</p>}
-
-      {!isLoading && !error && !hasEntries && (
-        <p className="text-sm text-slate-400">Leaderboard data is unavailable right now. Try again shortly.</p>
-      )}
+      {!isLoading && !error && !hasEntries && <p className="text-sm text-slate-400">Leaderboard data is unavailable right now.</p>}
 
       {!isLoading && !error && hasEntries && (
-        <ul className="grid gap-3 md:grid-cols-2">
-          {entries.map((entry) => {
-            const isSelected = selectedAddress === entry.address;
-            let avatar = entry.avatarUrl;
-            if (!avatar) {
-              avatar = generateAvatar(entry.address);
-            }
-            return (
-              <li key={`${entry.rank}-${entry.address}`}>
-                <button
-                  type="button"
-                  onClick={() => onSelect(entry.address)}
-                  className={`w-full rounded-xl border px-4 py-4 text-left transition ${
-                    isSelected
-                      ? 'border-primary bg-primary/10 text-white shadow-lg'
-                      : 'border-slate-700/60 bg-slate-900/40 text-slate-200 hover:border-primary/50 hover:bg-slate-900/60'
-                  }`}
-                >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <div className="flex items-center gap-3 text-sm font-medium">
-                      <span
-                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full border text-xs uppercase ${
-                          isSelected
-                            ? 'border-primary/60 bg-primary/10 text-primary'
-                            : 'border-slate-700 bg-slate-900 text-slate-300'
-                        }`}
-                      >
-                        #{entry.rank}
-                      </span>
-                      <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-800 bg-slate-900">
-                        <img
-                          src={avatar}
-                          alt={`${entry.displayName} avatar`}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      </span>
-                      <span>{entry.displayName}</span>
-                    </div>
-                    <span
-                      className={`text-sm font-semibold ${
-                        entry.roi !== null && entry.roi >= 0 ? 'text-emerald-300' : 'text-rose-300'
+        <>
+          <div className="grid gap-4 md:grid-cols-3 md:items-end">
+            <div className="reveal reveal-1">{second && <PodiumCard entry={second} onSelect={onSelect} compact />}</div>
+            <div className="reveal">{first && <PodiumCard entry={first} onSelect={onSelect} emphasized />}</div>
+            <div className="reveal reveal-2">{third && <PodiumCard entry={third} onSelect={onSelect} compact />}</div>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-slate-800/60 bg-slate-900/50 reveal reveal-1">
+            <table className="min-w-full text-sm">
+              <thead className="border-b border-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-4 py-3">Rank</th>
+                  <th className="px-4 py-3">Trader</th>
+                  <th className="px-4 py-3 text-right">ROI</th>
+                  <th className="px-4 py-3 text-right">P&L</th>
+                  <th className="px-4 py-3 text-right">Volume</th>
+                  <th className="px-4 py-3 text-right">Trades</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[first, second, third, ...rest].filter(Boolean).map((entry) => {
+                  const trader = entry as LeaderboardEntry;
+                  const isSelected = selectedAddress === entry.address;
+                  return (
+                    <tr
+                      key={trader.address}
+                      onClick={() => onSelect(trader.address)}
+                      className={`cursor-pointer border-b border-slate-800/40 transition last:border-b-0 ${
+                        isSelected ? 'bg-blue-500/10' : 'hover:bg-slate-800/50'
                       }`}
                     >
-                      {formatPercent(entry.roi)}
-                    </span>
-                  </div>
-                  <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400">
-                    <div>
-                      <dt className="uppercase tracking-wide">P&L</dt>
-                      <dd className="font-medium text-slate-200">{formatUsd(entry.pnl)}</dd>
-                    </div>
-                    <div>
-                      <dt className="uppercase tracking-wide">Volume</dt>
-                      <dd className="font-medium text-slate-200">{formatUsd(entry.volume)}</dd>
-                    </div>
-                  </dl>
-                  <p className="mt-3 text-xs text-slate-500 break-all">{entry.address}</p>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+                      <td className="px-4 py-3 font-semibold text-slate-200">#{trader.rank}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={getAvatar(trader)}
+                            alt={`${trader.displayName} avatar`}
+                            className="h-8 w-8 rounded-full object-cover"
+                          />
+                          <div>
+                            <p className="font-medium text-slate-100">{trader.displayName}</p>
+                            <p className="text-xs text-slate-500">{trader.address}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-right font-semibold ${
+                          trader.roi !== null && trader.roi >= 0 ? 'text-emerald-300' : 'text-rose-300'
+                        }`}
+                      >
+                        {formatPercent(trader.roi)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-100">{formatUsd(trader.pnl)}</td>
+                      <td className="px-4 py-3 text-right text-slate-200">{formatUsd(trader.volume)}</td>
+                      <td className="px-4 py-3 text-right text-slate-200">{formatNumber(trader.trades)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </section>
   );
