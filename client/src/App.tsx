@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BrowserRouter as Router, Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { Leaderboard, type LeaderboardEntry } from './components/Leaderboard';
+import BreakingNewsBanner from './components/BreakingNewsBanner';
 import { TraderDashboard } from './components/TraderDashboard';
 import { TraderSearch } from './components/TraderSearch';
 import { useSession } from './hooks/useSession';
@@ -381,6 +382,10 @@ function LeaderboardPage() {
           connectWallet={connectWallet}
           disconnectWallet={disconnectWallet}
         />
+
+        <div className="overflow-hidden rounded-2xl border border-slate-800/60">
+          <BreakingNewsBanner />
+        </div>
 
         {(sessionError || walletError) && (
           <div className="flex items-start justify-between gap-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">

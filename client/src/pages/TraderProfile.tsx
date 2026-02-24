@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { Trade } from '../hooks/useLiveTrades';
+import BreakingNewsBanner from '../components/BreakingNewsBanner';
 
 type PnlPayload = {
   pnl: number | null;
@@ -119,14 +120,79 @@ export default function TraderProfile() {
     }));
   }, [trades]);
 
+  const derivedMetrics = useMemo(() => {
+    if (!trades.length) {
+      return {
+        totalNotional: 0,
+        buyCount: 0,
+        sellCount: 0,
+        marketCount: 0,
+        avgTradeSize: 0,
+        lastTradeAt: null as string | null
+      };
+    }
+
+    let totalNotional = 0;
+    let totalSize = 0;
+    let buyCount = 0;
+    let sellCount = 0;
+    const markets = new Set<string>();
+    let latestTimestamp = 0;
+
+    trades.forEach((trade) => {
+      const size = Number(trade.amount || trade.size || trade.shares || 0);
+      const price = Number(trade.price || 0);
+      if (Number.isFinite(size) && Number.isFinite(price)) {
+        totalNotional += Math.abs(size * price);
+      }
+      if (Number.isFinite(size)) {
+        totalSize += Math.abs(size);
+      }
+
+      const side = String(trade.side || trade.type || '').toLowerCase();
+      if (side === 'buy') buyCount += 1;
+      if (side === 'sell') sellCount += 1;
+
+      const market =
+        (typeof trade.market === 'string' ? trade.market : trade.market?.question || trade.market?.title) ||
+        trade.marketId ||
+        trade.market_id ||
+        'Unknown market';
+      markets.add(String(market));
+
+      const ts = new Date((trade.created_at || trade.createdAt || trade.timestamp || 0) as any).getTime();
+      if (Number.isFinite(ts)) {
+        latestTimestamp = Math.max(latestTimestamp, ts);
+      }
+    });
+
+    return {
+      totalNotional,
+      buyCount,
+      sellCount,
+      marketCount: markets.size,
+      avgTradeSize: trades.length > 0 ? totalSize / trades.length : 0,
+      lastTradeAt: latestTimestamp > 0 ? new Date(latestTimestamp).toLocaleString() : null
+    };
+  }, [trades]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
       <div className="mx-auto max-w-6xl px-6 py-10 space-y-6">
+        <div className="overflow-hidden rounded-2xl border border-slate-800/60">
+          <BreakingNewsBanner />
+        </div>
+
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Trader Profile</h1>
-          <Link to="/" className="rounded-full border border-slate-700 px-4 py-2 text-sm hover:border-slate-500">
-            Back to Dashboard
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/" className="rounded-full border border-slate-700 px-4 py-2 text-sm hover:border-slate-500">
+              Dashboard
+            </Link>
+            <Link to="/leaderboard" className="rounded-full border border-slate-700 px-4 py-2 text-sm hover:border-slate-500">
+              Leaderboard
+            </Link>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4 text-sm text-slate-300">
@@ -138,7 +204,7 @@ export default function TraderProfile() {
 
         {!loading && !error && (
           <>
-            <section className="grid gap-4 md:grid-cols-3">
+            <section className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
               <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
                 <p className="text-xs uppercase text-slate-500">PnL</p>
                 <p className={`mt-2 text-xl font-semibold ${(pnl?.pnl ?? 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
@@ -153,6 +219,24 @@ export default function TraderProfile() {
               <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
                 <p className="text-xs uppercase text-slate-500">Trades Loaded</p>
                 <p className="mt-2 text-xl font-semibold text-slate-100">{pnl?.tradeCount ?? trades.length}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
+                <p className="text-xs uppercase text-slate-500">Total Notional</p>
+                <p className="mt-2 text-xl font-semibold text-slate-100">{formatUsd(derivedMetrics.totalNotional)}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
+                <p className="text-xs uppercase text-slate-500">Markets Traded</p>
+                <p className="mt-2 text-xl font-semibold text-slate-100">{derivedMetrics.marketCount}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Buys {derivedMetrics.buyCount} · Sells {derivedMetrics.sellCount}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
+                <p className="text-xs uppercase text-slate-500">Avg Trade Size</p>
+                <p className="mt-2 text-xl font-semibold text-slate-100">
+                  {Number.isFinite(derivedMetrics.avgTradeSize) ? derivedMetrics.avgTradeSize.toFixed(2) : '—'}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">{derivedMetrics.lastTradeAt ? `Last trade: ${derivedMetrics.lastTradeAt}` : 'No recency data'}</p>
               </div>
             </section>
 

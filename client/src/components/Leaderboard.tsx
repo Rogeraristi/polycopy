@@ -1,3 +1,5 @@
+import { useMemo, useState } from 'react';
+
 export interface LeaderboardEntry {
   address: string;
   displayName: string;
@@ -133,10 +135,40 @@ export function Leaderboard({
   selectedPeriod = null,
   onPeriodChange
 }: LeaderboardProps) {
-  const hasEntries = entries.length > 0;
+  const [query, setQuery] = useState('');
+  const [minRoiInput, setMinRoiInput] = useState('');
+  const [minPnlInput, setMinPnlInput] = useState('');
+
+  const minRoi = minRoiInput.trim() === '' ? null : Number(minRoiInput);
+  const minPnl = minPnlInput.trim() === '' ? null : Number(minPnlInput);
+
+  const filteredEntries = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    return entries.filter((entry) => {
+      const matchesQuery =
+        normalizedQuery.length === 0 ||
+        entry.displayName.toLowerCase().includes(normalizedQuery) ||
+        entry.address.toLowerCase().includes(normalizedQuery) ||
+        (entry.username || '').toLowerCase().includes(normalizedQuery) ||
+        (entry.pseudonym || '').toLowerCase().includes(normalizedQuery);
+
+      const matchesRoi = minRoi === null || (entry.roi !== null && entry.roi >= minRoi);
+      const matchesPnl = minPnl === null || (entry.pnl !== null && entry.pnl >= minPnl);
+
+      return matchesQuery && matchesRoi && matchesPnl;
+    });
+  }, [entries, query, minRoi, minPnl]);
+
+  const clearFilters = () => {
+    setQuery('');
+    setMinRoiInput('');
+    setMinPnlInput('');
+  };
+
+  const hasEntries = filteredEntries.length > 0;
   const hasPeriodControls = periodOptions.length > 0;
 
-  const sorted = [...entries].sort((a, b) => a.rank - b.rank);
+  const sorted = [...filteredEntries].sort((a, b) => a.rank - b.rank);
   const first = sorted.find((entry) => entry.rank === 1) || sorted[0] || null;
   const second = sorted.find((entry) => entry.rank === 2) || sorted[1] || null;
   const third = sorted.find((entry) => entry.rank === 3) || sorted[2] || null;
@@ -203,8 +235,41 @@ export function Leaderboard({
         )}
       </header>
 
+      <div className="grid gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-3 md:grid-cols-[minmax(0,1fr),130px,130px,auto]">
+        <input
+          type="text"
+          placeholder="Filter by trader name, username, or wallet"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          className="rounded-xl border border-slate-700/80 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+        />
+        <input
+          type="number"
+          step="0.1"
+          placeholder="Min ROI %"
+          value={minRoiInput}
+          onChange={(event) => setMinRoiInput(event.target.value)}
+          className="rounded-xl border border-slate-700/80 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+        />
+        <input
+          type="number"
+          step="1"
+          placeholder="Min P&L"
+          value={minPnlInput}
+          onChange={(event) => setMinPnlInput(event.target.value)}
+          className="rounded-xl border border-slate-700/80 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+        />
+        <button
+          type="button"
+          onClick={clearFilters}
+          className="rounded-xl border border-slate-700/80 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500"
+        >
+          Clear
+        </button>
+      </div>
+
       {!isLoading && error && <p className="text-sm text-rose-300">{error}</p>}
-      {!isLoading && !error && !hasEntries && <p className="text-sm text-slate-400">Leaderboard data is unavailable right now.</p>}
+      {!isLoading && !error && !hasEntries && <p className="text-sm text-slate-400">No traders match the current filters.</p>}
 
       {!isLoading && !error && hasEntries && (
         <>
