@@ -112,6 +112,12 @@ const LEADERBOARD_PERIODS = {
   monthly: { path: '/leaderboard/overall/monthly/profit', label: 'This Month' },
   all: { path: '/leaderboard/overall/all/profit', label: 'All Time' }
 };
+const LEADERBOARD_PERIOD_DATA_ALIASES = {
+  today: ['today', '24h', '1d', 'day'],
+  weekly: ['weekly', '7d', 'week'],
+  monthly: ['monthly', '30d', 'month'],
+  all: ['all', 'all_time', 'alltime', 'lifetime']
+};
 const LEADERBOARD_DEFAULT_PERIOD = 'weekly';
 const LEADERBOARD_LIMIT = Number.isFinite(Number(process.env.LEADERBOARD_LIMIT))
   ? Math.max(1, Math.min(Number(process.env.LEADERBOARD_LIMIT), 50))
@@ -635,15 +641,39 @@ async function fetchJson(url) {
   return response.json();
 }
 
-async function fetchUserTrades(address) {
+function resolvePeriodWindowMs(period) {
+  const normalized = String(period || '').trim().toLowerCase();
+  if (!normalized || normalized === 'all' || normalized === 'all_time' || normalized === 'alltime') {
+    return null;
+  }
+  if (['today', '24h', '1d', 'day'].includes(normalized)) return 24 * 60 * 60 * 1000;
+  if (['weekly', '7d', 'week'].includes(normalized)) return 7 * 24 * 60 * 60 * 1000;
+  if (['monthly', '30d', 'month'].includes(normalized)) return 30 * 24 * 60 * 60 * 1000;
+  return null;
+}
+
+function filterTradesByPeriod(trades, period) {
+  const windowMs = resolvePeriodWindowMs(period);
+  if (windowMs === null) return trades;
+  const cutoff = Date.now() - windowMs;
+  return trades.filter((trade) => {
+    const ts = trade?.created_at || trade?.createdAt || trade?.timestamp || trade?.time;
+    const parsed = new Date(ts).getTime();
+    return Number.isFinite(parsed) && parsed >= cutoff;
+  });
+}
+
+async function fetchUserTrades(address, options = {}) {
+  const { period = 'all', limit = 150 } = options;
   const params = new URLSearchParams({
     account: address,
-    limit: '25'
+    limit: String(Math.max(25, Math.min(Number(limit) || 150, 500)))
   });
   const url = `${POLYMARKET_BASE}/trades?${params.toString()}`;
   try {
     const payload = await fetchJson(url);
-    return normaliseTradesPayload(payload);
+    const normalized = normaliseTradesPayload(payload);
+    return filterTradesByPeriod(normalized, period);
   } catch (error) {
     console.error('Failed to fetch trades', error.message);
     return [];
@@ -1232,6 +1262,7 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
 
   const periods = {};
   const labels = {};
+  const diagnostics = {};
   let source = 'polymarket';
   const fetchedAt = Date.now();
 
@@ -1246,14 +1277,49 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
   // 1) Primary source: try fetching each period path independently.
   await Promise.all(
     Object.entries(LEADERBOARD_PERIODS).map(async ([periodKey, config]) => {
+      diagnostics[periodKey] = {
+        label: config.label,
+        source: 'unavailable',
+        count: 0,
+        details: null
+      };
       try {
-        const entries = await fetchLeaderboardFromPath(config.path, limit);
+        const dataApiResult = await fetchLeaderboardFromDataApi(periodKey, limit);
+        let entries = dataApiResult.entries;
+        if (entries.length === 0) {
+          entries = await fetchLeaderboardFromPath(config.path, limit);
+          if (entries.length > 0) {
+            diagnostics[periodKey] = {
+              label: config.label,
+              source: 'scrape',
+              count: entries.length,
+              details: { path: config.path }
+            };
+          }
+        } else {
+          diagnostics[periodKey] = {
+            label: config.label,
+            source: 'data-api',
+            count: entries.length,
+            details: {
+              endpoint: dataApiResult.endpoint,
+              alias: dataApiResult.alias,
+              url: dataApiResult.url
+            }
+          };
+        }
         if (entries.length > 0) {
           periods[periodKey] = normaliseAndRank(entries);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.error(`Failed to fetch leaderboard period ${periodKey}`, message);
+        diagnostics[periodKey] = {
+          label: config.label,
+          source: 'error',
+          count: 0,
+          details: { message }
+        };
       }
     })
   );
@@ -1265,6 +1331,12 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
       if (fallbackEntries.length > 0) {
         source = 'fallback';
         periods.weekly = normaliseAndRank(fallbackEntries);
+        diagnostics.weekly = {
+          label: LEADERBOARD_PERIODS.weekly.label,
+          source: 'fallback',
+          count: periods.weekly.length,
+          details: { note: 'Fallback leaderboard snapshot' }
+        };
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1284,6 +1356,12 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
       if (entries.length > 0) {
         source = 'apify';
         periods.weekly = normaliseAndRank(entries);
+        diagnostics.weekly = {
+          label: LEADERBOARD_PERIODS.weekly.label,
+          source: 'apify',
+          count: periods.weekly.length,
+          details: { dataset: APIFY_LEADERBOARD_URL }
+        };
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1291,19 +1369,10 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
     }
   }
 
-  // 4) Ensure all tabs exist while keeping distinct data where available.
+  // 4) Attach labels for all known periods.
   const orderedKeys = Object.keys(LEADERBOARD_PERIODS);
   for (const key of orderedKeys) {
     labels[key] = LEADERBOARD_PERIODS[key].label;
-    if (!periods[key]) {
-      // Prefer the closest known bucket to avoid blank tabs.
-      periods[key] =
-        periods.weekly ||
-        periods.monthly ||
-        periods.all ||
-        periods.today ||
-        [];
-    }
   }
 
   const availableKeys = orderedKeys.filter((key) => Array.isArray(periods[key]) && periods[key].length > 0);
@@ -1314,6 +1383,7 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
   return {
     periods,
     labels,
+    diagnostics,
     defaultPeriod,
     fetchedAt,
     source
@@ -1723,6 +1793,45 @@ async function fetchLeaderboardFromPath(path, limit = LEADERBOARD_LIMIT) {
   }
 }
 
+async function fetchLeaderboardFromDataApi(periodKey, limit = LEADERBOARD_LIMIT) {
+  const aliases = LEADERBOARD_PERIOD_DATA_ALIASES[periodKey] || [periodKey];
+  const endpoints = ['/leaderboard', '/leaderboard/traders', '/trades/leaderboard', '/leaderboard/accounts'];
+
+  for (const endpoint of endpoints) {
+    for (const alias of aliases) {
+      const url = new URL(`${POLYMARKET_DATA_API_BASE}${endpoint}`);
+      url.searchParams.set('limit', String(limit));
+      url.searchParams.set('period', alias);
+      url.searchParams.set('window', alias);
+      url.searchParams.set('interval', alias);
+      try {
+        const payload = await fetchJson(url.toString());
+        const entries = normaliseLeaderboardEntries(payload, limit);
+        if (entries.length > 0) {
+          return {
+            entries,
+            endpoint,
+            alias,
+            url: url.toString()
+          };
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/404|not found/i.test(message)) {
+          console.error(`Failed to fetch data-api leaderboard ${periodKey} from ${url}`, message);
+        }
+      }
+    }
+  }
+
+  return {
+    entries: [],
+    endpoint: null,
+    alias: null,
+    url: null
+  };
+}
+
 async function requestTraderSearch(query, limit = 8) {
   if (!POLYMARKET_SEARCH_API_URL) {
     throw new Error('Trader search URL is not configured');
@@ -1902,8 +2011,10 @@ app.get('/api/breaking-news', async (req, res) => {
 
 app.get('/api/users/:address/trades', async (req, res) => {
   const { address } = req.params;
-  const trades = await fetchUserTrades(address);
-  res.json({ trades });
+  const period = typeof req.query?.period === 'string' ? req.query.period : 'all';
+  const limit = Number.isFinite(Number(req.query?.limit)) ? Number(req.query.limit) : 150;
+  const trades = await fetchUserTrades(address, { period, limit });
+  res.json({ trades, period, limit });
 });
 
 app.post('/api/copy-trade', async (req, res) => {
@@ -2013,11 +2124,18 @@ app.post('/api/copy-trade/execute', async (req, res) => {
 
 app.get('/api/leaderboard', async (req, res) => {
   const forceRefreshRaw = req.query?.refresh;
+  const includeDebugRaw = req.query?.debug;
   const forceRefresh =
     typeof forceRefreshRaw === 'string'
       ? forceRefreshRaw === '1' || forceRefreshRaw.toLowerCase() === 'true'
       : Array.isArray(forceRefreshRaw)
       ? forceRefreshRaw.includes('1') || forceRefreshRaw.some((value) => value?.toLowerCase?.() === 'true')
+      : false;
+  const includeDebug =
+    typeof includeDebugRaw === 'string'
+      ? includeDebugRaw === '1' || includeDebugRaw.toLowerCase() === 'true'
+      : Array.isArray(includeDebugRaw)
+      ? includeDebugRaw.includes('1') || includeDebugRaw.some((value) => value?.toLowerCase?.() === 'true')
       : false;
 
   const now = Date.now();
@@ -2025,6 +2143,7 @@ app.get('/api/leaderboard', async (req, res) => {
     if (!forceRefresh && leaderboardCache.snapshot && leaderboardCache.expiresAt > now) {
       res.json({
         ...leaderboardCache.snapshot,
+        ...(includeDebug ? { diagnostics: leaderboardCache.snapshot?.diagnostics || {} } : {}),
         limit: LEADERBOARD_LIMIT,
         cache: {
           hit: true,
@@ -2044,6 +2163,7 @@ app.get('/api/leaderboard', async (req, res) => {
       periods: snapshot.periods,
       labels: snapshot.labels,
       defaultPeriod: snapshot.defaultPeriod,
+      ...(includeDebug ? { diagnostics: snapshot.diagnostics || {} } : {}),
       limit: LEADERBOARD_LIMIT,
       fetchedAt: snapshot.fetchedAt || null,
       source: snapshot.source || 'unknown',
@@ -2057,6 +2177,67 @@ app.get('/api/leaderboard', async (req, res) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error('Failed to retrieve leaderboard snapshot', message);
     res.status(503).json({ error: 'Leaderboard data is unavailable right now. Try again shortly.' });
+  }
+});
+
+app.get('/api/leaderboard/debug', async (req, res) => {
+  const forceRefreshRaw = req.query?.refresh;
+  const forceRefresh =
+    typeof forceRefreshRaw === 'string'
+      ? forceRefreshRaw === '1' || forceRefreshRaw.toLowerCase() === 'true'
+      : Array.isArray(forceRefreshRaw)
+      ? forceRefreshRaw.includes('1') || forceRefreshRaw.some((value) => value?.toLowerCase?.() === 'true')
+      : false;
+
+  const now = Date.now();
+  try {
+    if (!forceRefresh && leaderboardCache.snapshot && leaderboardCache.expiresAt > now) {
+      const cachedSnapshot = leaderboardCache.snapshot;
+      const availablePeriods = Object.keys(cachedSnapshot.periods || {}).filter(
+        (key) => Array.isArray(cachedSnapshot.periods[key]) && cachedSnapshot.periods[key].length > 0
+      );
+      res.json({
+        fetchedAt: cachedSnapshot.fetchedAt || null,
+        source: cachedSnapshot.source || 'unknown',
+        defaultPeriod: cachedSnapshot.defaultPeriod || LEADERBOARD_DEFAULT_PERIOD,
+        labels: cachedSnapshot.labels || {},
+        diagnostics: cachedSnapshot.diagnostics || {},
+        availablePeriods,
+        cache: {
+          hit: true,
+          expiresAt: leaderboardCache.expiresAt,
+          ttlMs: Math.max(0, leaderboardCache.expiresAt - now)
+        }
+      });
+      return;
+    }
+
+    const snapshot = await fetchLeaderboardSnapshots(LEADERBOARD_LIMIT);
+    const nextExpiresAt = now + LEADERBOARD_CACHE_TTL_MS;
+    leaderboardCache.snapshot = snapshot;
+    leaderboardCache.expiresAt = nextExpiresAt;
+    const availablePeriods = Object.keys(snapshot.periods || {}).filter(
+      (key) => Array.isArray(snapshot.periods[key]) && snapshot.periods[key].length > 0
+    );
+
+    res.json({
+      fetchedAt: snapshot.fetchedAt || null,
+      source: snapshot.source || 'unknown',
+      defaultPeriod: snapshot.defaultPeriod || LEADERBOARD_DEFAULT_PERIOD,
+      labels: snapshot.labels || {},
+      diagnostics: snapshot.diagnostics || {},
+      availablePeriods,
+      limit: LEADERBOARD_LIMIT,
+      cache: {
+        hit: false,
+        expiresAt: nextExpiresAt,
+        ttlMs: LEADERBOARD_CACHE_TTL_MS
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error('Failed to retrieve leaderboard debug snapshot', message);
+    res.status(503).json({ error: 'Leaderboard debug data is unavailable right now. Try again shortly.' });
   }
 });
 
@@ -2083,11 +2264,14 @@ app.get('/api/users/:address/portfolio', async (req, res) => {
 app.get('/api/users/:address/pnl', async (req, res) => {
   const { address } = req.params;
   try {
-    const trades = await fetchUserTrades(address);
+    const period = typeof req.query?.period === 'string' ? req.query.period : 'all';
+    const limit = Number.isFinite(Number(req.query?.limit)) ? Number(req.query.limit) : 150;
+    const trades = await fetchUserTrades(address, { period, limit });
     const pnlData = computePnlFromTrades(trades);
 
     res.json({
       address: address.toLowerCase(),
+      period,
       ...pnlData
     });
   } catch (error) {
@@ -2099,7 +2283,9 @@ app.get('/api/users/:address/pnl', async (req, res) => {
 app.get('/api/users/:address/open-orders', async (req, res) => {
   const { address } = req.params;
   try {
-    const trades = await fetchUserTrades(address);
+    const period = typeof req.query?.period === 'string' ? req.query.period : 'all';
+    const limit = Number.isFinite(Number(req.query?.limit)) ? Number(req.query.limit) : 150;
+    const trades = await fetchUserTrades(address, { period, limit });
     const snapshot = computePortfolioSnapshotFromTrades(trades);
     const openOrders = snapshot.openPositions.map((position) => ({
       market: position.market,
@@ -2111,6 +2297,7 @@ app.get('/api/users/:address/open-orders', async (req, res) => {
 
     res.json({
       address: address.toLowerCase(),
+      period,
       openOrders,
       derived: true,
       note: 'Polymarket does not provide public open order books per wallet via this endpoint; these are derived open positions from recent fills.'
@@ -2124,7 +2311,9 @@ app.get('/api/users/:address/open-orders', async (req, res) => {
 app.get('/api/users/:address/overview', async (req, res) => {
   const { address } = req.params;
   try {
-    const trades = await fetchUserTrades(address);
+    const period = typeof req.query?.period === 'string' ? req.query.period : 'all';
+    const limit = Number.isFinite(Number(req.query?.limit)) ? Number(req.query.limit) : 150;
+    const trades = await fetchUserTrades(address, { period, limit });
     const [portfolioValue] = await Promise.all([fetchUserTotalPositionValue(address)]);
     const snapshot = computePortfolioSnapshotFromTrades(trades);
     const pnlData = computePnlFromTrades(trades);
@@ -2138,6 +2327,7 @@ app.get('/api/users/:address/overview', async (req, res) => {
 
     res.json({
       address: address.toLowerCase(),
+      period,
       trades,
       pnl: pnlData,
       portfolio: {

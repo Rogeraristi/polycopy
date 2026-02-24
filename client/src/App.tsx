@@ -20,12 +20,12 @@ const overviewPrefetchCache = new Map<
   { expiresAt: number; promise: Promise<any> | null; data: any | null }
 >();
 
-function getOverviewCacheKey(address: string) {
-  return `trader_overview_${address.toLowerCase()}`;
+function getOverviewCacheKey(address: string, period = 'all') {
+  return `trader_overview_${address.toLowerCase()}_${period}`;
 }
 
 function persistOverview(address: string, payload: any) {
-  const key = getOverviewCacheKey(address);
+  const key = getOverviewCacheKey(address, 'all');
   const now = Date.now();
   overviewPrefetchCache.set(address.toLowerCase(), {
     expiresAt: now + OVERVIEW_PREFETCH_TTL_MS,
@@ -46,7 +46,7 @@ function prefetchTraderOverview(address: string) {
   const cached = overviewPrefetchCache.get(normalized);
   if (cached && cached.expiresAt > now) return;
 
-  const promise = fetch(`${API_BASE}/users/${normalized}/overview`, { credentials: 'include' })
+  const promise = fetch(`${API_BASE}/users/${normalized}/overview?period=all&limit=250`, { credentials: 'include' })
     .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`overview ${res.status}`))))
     .then((payload) => {
       persistOverview(normalized, payload);
@@ -88,15 +88,26 @@ function useLeaderboardData() {
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
     let isActive = true;
+    let intervalId: number | null = null;
+    let inFlightController: AbortController | null = null;
 
-    setIsLeaderboardLoading(true);
-    setLeaderboardError(null);
-
-    fetch(`${API_BASE}/leaderboard`, { signal: controller.signal, credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Failed to load leaderboard (${res.status})`))))
-      .then((data) => {
+    const load = async (force = false, initial = false) => {
+      if (!isActive) return;
+      if (initial) {
+        setIsLeaderboardLoading(true);
+      }
+      setLeaderboardError(null);
+      inFlightController?.abort();
+      const controller = new AbortController();
+      inFlightController = controller;
+      try {
+        const endpoint = `${API_BASE}/leaderboard${force ? '?refresh=1' : ''}`;
+        const res = await fetch(endpoint, { signal: controller.signal, credentials: 'include' });
+        if (!res.ok) {
+          throw new Error(`Failed to load leaderboard (${res.status})`);
+        }
+        const data = await res.json();
         if (!isActive) return;
 
         const rawPeriods = data?.periods && typeof data.periods === 'object' ? data.periods : {};
@@ -131,22 +142,28 @@ function useLeaderboardData() {
             return acc;
           }, {})
         );
-        setActiveLeaderboardPeriod(preferred);
-      })
-      .catch((err) => {
+        setActiveLeaderboardPeriod((current) => (availableKeys.includes(current) ? current : preferred));
+      } catch (err) {
         if (!isActive) return;
         setLeaderboardPeriods({});
         setLeaderboardLabels({});
         setLeaderboardError(err instanceof Error ? err.message : 'Failed to load leaderboard');
-      })
-      .finally(() => {
-        if (!isActive) return;
-        setIsLeaderboardLoading(false);
-      });
+      } finally {
+        if (isActive) {
+          setIsLeaderboardLoading(false);
+        }
+      }
+    };
+
+    void load(false, true);
+    intervalId = window.setInterval(() => {
+      void load(true, false);
+    }, 60_000);
 
     return () => {
       isActive = false;
-      controller.abort();
+      inFlightController?.abort();
+      if (intervalId) window.clearInterval(intervalId);
     };
   }, []);
 
@@ -223,7 +240,7 @@ function TopNav({
       <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-3">
-            <MetallicLogo size={36} animated={currentPath === '/'} />
+            <MetallicLogo size={42} animated />
             <div>
               <p className="text-sm font-semibold tracking-wide text-white">PolyCopy</p>
               <p className="text-xs text-slate-400">Built for Polymarket</p>

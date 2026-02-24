@@ -39,8 +39,8 @@ type LeaderboardContextEntry = {
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 const OVERVIEW_CACHE_TTL_MS = 1000 * 60 * 3;
 
-function getOverviewCacheKey(address: string) {
-  return `trader_overview_${address.toLowerCase()}`;
+function getOverviewCacheKey(address: string, period: string) {
+  return `trader_overview_${address.toLowerCase()}_${period}`;
 }
 
 function formatUsd(value: number | null) {
@@ -61,6 +61,7 @@ export default function TraderProfile() {
   const [portfolio, setPortfolio] = useState<PortfolioPayload | null>(null);
   const [openOrders, setOpenOrders] = useState<OpenOrdersPayload | null>(null);
   const [leaderboardContext, setLeaderboardContext] = useState<LeaderboardContextEntry | null>(navigationEntry);
+  const [period, setPeriod] = useState<'today' | 'weekly' | 'monthly' | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,7 +106,7 @@ export default function TraderProfile() {
     let hydratedFromCache = false;
     if (typeof window !== 'undefined') {
       try {
-        const raw = window.sessionStorage.getItem(getOverviewCacheKey(normalizedAddress));
+        const raw = window.sessionStorage.getItem(getOverviewCacheKey(normalizedAddress, period));
         if (raw) {
           const parsed = JSON.parse(raw);
           const savedAt = Number(parsed?.savedAt || 0);
@@ -120,7 +121,15 @@ export default function TraderProfile() {
     setLoading(!hydratedFromCache);
     setError(null);
 
-    fetch(`${API_BASE}/users/${address}/overview`, { signal: controller.signal, credentials: 'include' })
+    const overviewQuery = new URLSearchParams({
+      period,
+      limit: '250'
+    });
+
+    fetch(`${API_BASE}/users/${address}/overview?${overviewQuery.toString()}`, {
+      signal: controller.signal,
+      credentials: 'include'
+    })
       .then(async (overviewRes) => {
         if (overviewRes.ok) {
           const overview = await overviewRes.json();
@@ -129,7 +138,7 @@ export default function TraderProfile() {
           if (typeof window !== 'undefined') {
             try {
               window.sessionStorage.setItem(
-                getOverviewCacheKey(normalizedAddress),
+                getOverviewCacheKey(normalizedAddress, period),
                 JSON.stringify({ savedAt: Date.now(), payload: overview })
               );
             } catch {}
@@ -139,10 +148,19 @@ export default function TraderProfile() {
 
         // Fallback for older backend versions without overview endpoint.
         const [tradesRes, pnlRes, portfolioRes, ordersRes] = await Promise.all([
-          fetch(`${API_BASE}/users/${address}/trades`, { signal: controller.signal, credentials: 'include' }),
-          fetch(`${API_BASE}/users/${address}/pnl`, { signal: controller.signal, credentials: 'include' }),
+          fetch(`${API_BASE}/users/${address}/trades?${overviewQuery.toString()}`, {
+            signal: controller.signal,
+            credentials: 'include'
+          }),
+          fetch(`${API_BASE}/users/${address}/pnl?${overviewQuery.toString()}`, {
+            signal: controller.signal,
+            credentials: 'include'
+          }),
           fetch(`${API_BASE}/users/${address}/portfolio`, { signal: controller.signal, credentials: 'include' }),
-          fetch(`${API_BASE}/users/${address}/open-orders`, { signal: controller.signal, credentials: 'include' })
+          fetch(`${API_BASE}/users/${address}/open-orders?${overviewQuery.toString()}`, {
+            signal: controller.signal,
+            credentials: 'include'
+          })
         ]);
 
         if (!tradesRes.ok) throw new Error(`Failed to load trades (${tradesRes.status})`);
@@ -195,7 +213,7 @@ export default function TraderProfile() {
       cancelled = true;
       controller.abort();
     };
-  }, [address, leaderboardContext?.pnl, leaderboardContext?.trades]);
+  }, [address, period, leaderboardContext?.pnl, leaderboardContext?.trades]);
 
   const tradeRows = useMemo(() => {
     return trades.map((trade, i) => ({
@@ -296,6 +314,33 @@ export default function TraderProfile() {
 
         <GlassPanel className="rounded-2xl p-4 text-sm text-slate-300">
           Address: <span className="font-mono break-all text-slate-100">{address}</span>
+        </GlassPanel>
+
+        <GlassPanel className="rounded-2xl p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { key: 'today', label: 'Today' },
+              { key: 'weekly', label: 'This Week' },
+              { key: 'monthly', label: 'This Month' },
+              { key: 'all', label: 'All Time' }
+            ].map((option) => {
+              const active = period === option.key;
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setPeriod(option.key as 'today' | 'weekly' | 'monthly' | 'all')}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    active
+                      ? 'bg-blue-600 text-white shadow shadow-blue-500/30'
+                      : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
         </GlassPanel>
 
         {leaderboardContext && (

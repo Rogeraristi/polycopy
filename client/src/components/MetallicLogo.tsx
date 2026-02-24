@@ -19,11 +19,14 @@ const fragmentShaderSource = `
   uniform sampler2D u_image;
   uniform float u_time;
   void main() {
-    vec2 uv = v_uv;
-    float metallic = 0.5 + 0.5 * sin(u_time + uv.x * 10.0 + uv.y * 10.0);
+    // Flip Y so canvas/WebGL texture orientation matches the source image.
+    vec2 uv = vec2(v_uv.x, 1.0 - v_uv.y);
+    // Lower spatial/temporal frequency to avoid visible flicker.
+    float metallic = 0.5 + 0.5 * sin(u_time * 0.9 + uv.x * 5.0 + uv.y * 4.0);
     vec4 color = texture2D(u_image, uv);
     float fresnel = pow(1.0 - dot(uv - 0.5, uv - 0.5) * 4.0, 2.0);
-    color.rgb += metallic * 0.4 + fresnel * 0.3;
+    vec3 highlight = vec3(metallic * 0.22 + fresnel * 0.16);
+    color.rgb = clamp(color.rgb + highlight, 0.0, 1.0);
     gl_FragColor = color;
   }
 `;
@@ -95,7 +98,11 @@ export default function MetallicLogo({ src = '/polycopy-logo3.png', size = 64, a
 
     let gl: WebGLRenderingContext | null = null;
     try {
-      gl = canvas.getContext('webgl');
+      gl = canvas.getContext('webgl', {
+        antialias: true,
+        alpha: true,
+        premultipliedAlpha: true
+      });
     } catch {
       gl = null;
     }
@@ -143,21 +150,19 @@ export default function MetallicLogo({ src = '/polycopy-logo3.png', size = 64, a
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
       gl.uniform1i(gl.getUniformLocation(program, 'u_image'), 0);
 
-      // Animation loop with smoother timing and easing
-      let lastTime = 0;
+      // Animation loop tuned for stable, low-flicker highlights.
+      let startTime = 0;
       function render(time: number) {
         if (!shouldAnimateRef.current) {
           animationRef.current = requestAnimationFrame(render);
           return;
         }
-        // Use high precision delta for smoothness
-        const delta = (time - lastTime) * 0.001;
-        lastTime = time;
+        if (startTime === 0) startTime = time;
+        const elapsed = (time - startTime) * 0.001;
         gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        // Use an eased time for metallic effect
-        const easedTime = Math.sin(time * 0.001) * 0.5 + 0.5;
-        gl.uniform1f(gl.getUniformLocation(program, 'u_time'), easedTime * time * 0.001);
+        gl.uniform1f(gl.getUniformLocation(program, 'u_time'), elapsed);
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         animationRef.current = requestAnimationFrame(render);
       }

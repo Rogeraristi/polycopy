@@ -48,11 +48,14 @@ export default function BreakingNewsBanner() {
   const tickerRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(0);
   const contentWidthRef = useRef(0);
+  const pausedRef = useRef(false);
+  const lastFrameTimeRef = useRef<number | null>(null);
   const [headlines, setHeadlines] = useState<HeadlineItem[]>([]);
   const [isPaused, setIsPaused] = useState(false);
-  const rotationCursorRef = useRef(0);
+  const lastPayloadRef = useRef('');
 
-  // Fetch live markets every 8 seconds
+  // Fetch live markets on an interval without rotating content windows
+  // so the marquee remains visually stable.
   useEffect(() => {
     let cancelled = false;
     async function fetchMarkets() {
@@ -88,20 +91,11 @@ export default function BreakingNewsBanner() {
           return bv - av;
         });
 
-        // Rotate which chunk is displayed each refresh so users see more live variety.
         const chunkSize = 16;
-        const maxStart = Math.max(0, uniqueMarkets.length - chunkSize);
-        if (maxStart > 0) {
-          rotationCursorRef.current = (rotationCursorRef.current + 4) % (maxStart + 1);
-        } else {
-          rotationCursorRef.current = 0;
-        }
-        const windowed = uniqueMarkets.slice(rotationCursorRef.current, rotationCursorRef.current + chunkSize);
-        const selected = windowed.length > 0 ? windowed : uniqueMarkets.slice(0, chunkSize);
+        const selected = uniqueMarkets.slice(0, chunkSize);
 
         const formatted = selected.map((m: any) => {
           const chance = parseChanceFromMarket(m) ?? (Number.isFinite(Number(m?.chance)) ? Number(m.chance) : null);
-          const outcomeText = typeof m?.outcomeLabel === 'string' && m.outcomeLabel.trim().length > 0 ? m.outcomeLabel.trim() : null;
           const resolvedUrl =
             typeof m?.url === 'string' && /^https?:\/\//.test(m.url)
               ? m.url
@@ -122,11 +116,17 @@ export default function BreakingNewsBanner() {
               '/polycopy-logo3.png'
           };
         });
-        if (!cancelled) setHeadlines(formatted);
+        if (!cancelled) {
+          const serialized = JSON.stringify(formatted);
+          if (serialized !== lastPayloadRef.current) {
+            lastPayloadRef.current = serialized;
+            setHeadlines(formatted);
+          }
+        }
       } catch {}
     }
     fetchMarkets();
-    const interval = setInterval(fetchMarkets, 8000);
+    const interval = setInterval(fetchMarkets, 15000);
     return () => {
       cancelled = true;
       clearInterval(interval);
@@ -135,10 +135,21 @@ export default function BreakingNewsBanner() {
 
   // Measure one full content cycle width (we render the list twice).
   useEffect(() => {
+    pausedRef.current = isPaused;
+  }, [isPaused]);
+
+  // Measure one full content cycle width (we render the list twice).
+  useEffect(() => {
     const ticker = tickerRef.current;
     if (!ticker) return;
     const measure = () => {
       contentWidthRef.current = ticker.scrollWidth / 2;
+      const loopWidth = contentWidthRef.current;
+      if (loopWidth > 0) {
+        const normalized = ((offsetRef.current % loopWidth) + loopWidth) % loopWidth;
+        offsetRef.current = -normalized;
+        ticker.style.transform = `translateX(${offsetRef.current}px)`;
+      }
     };
     measure();
     window.addEventListener('resize', measure);
@@ -150,12 +161,18 @@ export default function BreakingNewsBanner() {
     const ticker = tickerRef.current;
     if (!ticker) return;
     let animationId: number;
-    const speed = 0.18;
+    const speedPxPerSecond = 34;
 
-    function animate() {
+    function animate(time: number) {
       if (!ticker) return;
-      if (!isPaused) {
-        offsetRef.current -= speed;
+      if (lastFrameTimeRef.current === null) {
+        lastFrameTimeRef.current = time;
+      }
+      const deltaMs = Math.min(64, time - lastFrameTimeRef.current);
+      lastFrameTimeRef.current = time;
+
+      if (!pausedRef.current) {
+        offsetRef.current -= (speedPxPerSecond * deltaMs) / 1000;
         const loopWidth = contentWidthRef.current;
         if (loopWidth > 0 && Math.abs(offsetRef.current) >= loopWidth) {
           offsetRef.current += loopWidth;
@@ -165,9 +182,12 @@ export default function BreakingNewsBanner() {
       animationId = requestAnimationFrame(animate);
     }
 
-    animate();
-    return () => cancelAnimationFrame(animationId);
-  }, [headlines, isPaused]);
+    animationId = requestAnimationFrame(animate);
+    return () => {
+      cancelAnimationFrame(animationId);
+      lastFrameTimeRef.current = null;
+    };
+  }, []);
 
   return (
     <div
