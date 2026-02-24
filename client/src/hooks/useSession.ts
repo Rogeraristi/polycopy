@@ -40,11 +40,7 @@ export function useSession(): UseSessionResult {
   const [isActionPending, setIsActionPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use the full backend URL for API_BASE if running in production (Vercel), otherwise use local proxy
-  const API_BASE = import.meta.env.VITE_API_BASE_URL?.startsWith('http')
-    ? import.meta.env.VITE_API_BASE_URL
-    : 'https://polycopy.onrender.com';
-  console.log('VITE_API_BASE_URL:', API_BASE);
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
   const refresh = useCallback(async () => {
     setIsLoading(true);
     setError(null);

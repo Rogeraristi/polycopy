@@ -31,7 +31,7 @@ export function TraderDashboard({ address }: { address: string }) {
       setIsLoading(true);
       setError(null);
       try {
-        const API_BASE = (import.meta as any).env.VITE_API_BASE_URL;
+        const API_BASE = (import.meta as any).env.VITE_API_BASE_URL || '/api';
         // Fetch trades
         const tradesRes = await fetch(`${API_BASE}/users/${address}/trades`, {
           signal: abort.signal,

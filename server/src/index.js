@@ -477,6 +477,104 @@ function normaliseTradesPayload(payload) {
   return [];
 }
 
+function extractTradeTimestamp(trade) {
+  const raw = trade?.created_at || trade?.createdAt || trade?.timestamp || null;
+  if (raw === null) return null;
+  const millis = new Date(raw).getTime();
+  return Number.isFinite(millis) ? millis : null;
+}
+
+function extractTradeSize(trade) {
+  const numeric = toFiniteNumber(trade?.amount ?? trade?.size ?? trade?.shares ?? trade?.quantity);
+  return numeric ?? 0;
+}
+
+function extractTradePrice(trade) {
+  const numeric = toFiniteNumber(trade?.price ?? trade?.avgPrice ?? trade?.average_price);
+  return numeric ?? null;
+}
+
+function extractTradeSide(trade) {
+  const raw = trade?.side || trade?.type || '';
+  return typeof raw === 'string' ? raw.toLowerCase() : '';
+}
+
+function extractTradeMarketKey(trade) {
+  const market =
+    trade?.market_id ||
+    trade?.marketId ||
+    trade?.conditionId ||
+    trade?.token_id ||
+    trade?.asset_id ||
+    trade?.market?.id ||
+    trade?.market?.slug ||
+    trade?.market?.question ||
+    trade?.market;
+
+  if (typeof market !== 'string' || !market.trim()) {
+    return 'unknown';
+  }
+  return market.trim().toLowerCase();
+}
+
+function computePortfolioSnapshotFromTrades(trades) {
+  const positions = new Map();
+
+  for (const trade of trades) {
+    const side = extractTradeSide(trade);
+    const size = extractTradeSize(trade);
+    const price = extractTradePrice(trade);
+    const marketKey = extractTradeMarketKey(trade);
+
+    if (!positions.has(marketKey)) {
+      positions.set(marketKey, {
+        market: marketKey,
+        netShares: 0,
+        netCost: 0,
+        tradeCount: 0,
+        buys: 0,
+        sells: 0
+      });
+    }
+
+    const entry = positions.get(marketKey);
+    const signedSize = side === 'sell' ? -size : size;
+    const signedCost = price === null ? 0 : signedSize * price;
+
+    entry.netShares += signedSize;
+    entry.netCost += signedCost;
+    entry.tradeCount += 1;
+    if (side === 'buy') entry.buys += 1;
+    if (side === 'sell') entry.sells += 1;
+  }
+
+  const markets = Array.from(positions.values());
+  const openPositions = markets
+    .filter((entry) => Math.abs(entry.netShares) > 0.000001)
+    .map((entry) => ({
+      market: entry.market,
+      side: entry.netShares >= 0 ? 'long' : 'short',
+      shares: Number(entry.netShares.toFixed(6)),
+      avgEntryPrice:
+        Math.abs(entry.netShares) > 0.000001
+          ? Number((entry.netCost / entry.netShares).toFixed(6))
+          : null
+    }));
+
+  const notionalVolume = trades.reduce((acc, trade) => {
+    const size = extractTradeSize(trade);
+    const price = extractTradePrice(trade);
+    if (price === null) return acc;
+    return acc + Math.abs(size * price);
+  }, 0);
+
+  return {
+    openPositions,
+    marketCount: positions.size,
+    notionalVolume: Number(notionalVolume.toFixed(4))
+  };
+}
+
 async function fetchJson(url) {
   const response = await fetch(url, {
     headers: {
@@ -781,6 +879,36 @@ function normaliseTraderSearchResults(payload, limit = 8) {
         extraStats.totalVolume,
         extraStats.total_volume,
         extraStats.notional
+      );
+
+      const resolvedRoi = pickFirstNumber(
+        entry.roi,
+        entry.return,
+        entry.percentage_return,
+        entry.return_percentage,
+        metrics.roi,
+        metrics.return,
+        metrics.percentage_return,
+        metrics.return_percentage,
+        extraStats.roi,
+        extraStats.return,
+        extraStats.percentage_return,
+        extraStats.return_percentage
+      );
+
+      const resolvedTrades = pickFirstNumber(
+        entry.trades,
+        entry.tradeCount,
+        entry.trade_count,
+        entry.fills,
+        metrics.trades,
+        metrics.tradeCount,
+        metrics.trade_count,
+        metrics.fills,
+        extraStats.trades,
+        extraStats.tradeCount,
+        extraStats.trade_count,
+        extraStats.fills
       );
 
       results.push({
@@ -1240,11 +1368,40 @@ app.get('/api/users/:address/portfolio', async (req, res) => {
 app.get('/api/users/:address/pnl', async (req, res) => {
   const { address } = req.params;
   try {
-    // For demo: use leaderboard logic to get PnL if available
-    // Or fetch trades and sum up realized PnL if available in trade data
-    // Here, just return null or fake value
-    // TODO: Replace with real calculation if available
-    res.json({ address, pnl: null });
+    const trades = await fetchUserTrades(address);
+    const realisedFromPayload = trades.reduce((acc, trade) => {
+      const explicit =
+        toFiniteNumber(trade?.realizedPnl) ??
+        toFiniteNumber(trade?.realizedPnL) ??
+        toFiniteNumber(trade?.pnl) ??
+        null;
+      return explicit === null ? acc : acc + explicit;
+    }, 0);
+
+    const hasExplicitRealised = trades.some((trade) => {
+      return (
+        toFiniteNumber(trade?.realizedPnl) !== null ||
+        toFiniteNumber(trade?.realizedPnL) !== null ||
+        toFiniteNumber(trade?.pnl) !== null
+      );
+    });
+
+    const fallbackExposure = trades.reduce((acc, trade) => {
+      const side = extractTradeSide(trade);
+      const size = extractTradeSize(trade);
+      const price = extractTradePrice(trade);
+      if (price === null) return acc;
+      return acc + (side === 'sell' ? 1 : -1) * size * price;
+    }, 0);
+
+    const pnl = hasExplicitRealised ? realisedFromPayload : Number(fallbackExposure.toFixed(4));
+
+    res.json({
+      address: address.toLowerCase(),
+      pnl,
+      calculation: hasExplicitRealised ? 'sum_of_trade_realized_pnl_fields' : 'fallback_net_cashflow_proxy',
+      tradeCount: trades.length
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch PnL' });
   }
@@ -1252,9 +1409,27 @@ app.get('/api/users/:address/pnl', async (req, res) => {
 
 // GET /api/users/:address/open-orders
 app.get('/api/users/:address/open-orders', async (req, res) => {
-  // Polymarket API does not expose open orders directly; this is a placeholder
-  // TODO: Integrate with real open orders if available
-  res.json({ openOrders: [] });
+  const { address } = req.params;
+  try {
+    const trades = await fetchUserTrades(address);
+    const snapshot = computePortfolioSnapshotFromTrades(trades);
+    const openOrders = snapshot.openPositions.map((position) => ({
+      market: position.market,
+      side: position.side,
+      size: Math.abs(position.shares),
+      price: position.avgEntryPrice,
+      status: 'position_open'
+    }));
+
+    res.json({
+      address: address.toLowerCase(),
+      openOrders,
+      derived: true,
+      note: 'Polymarket does not provide public open order books per wallet via this endpoint; these are derived open positions from recent fills.'
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch open orders' });
+  }
 });
 
 const server = http.createServer(app);

@@ -49,7 +49,7 @@ export function useTraderSearch(query: string, options: TraderSearchOptions = {}
         limit: String(limit)
       });
 
-      const API_BASE = import.meta.env.VITE_API_BASE_URL;
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
       fetch(`${API_BASE}/trader-search?${searchParams.toString()}`, {
         signal: controller.signal,
         credentials: 'include'

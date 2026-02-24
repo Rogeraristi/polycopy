@@ -44,7 +44,7 @@ export function useLiveTrades(address: string | null) {
       setIsLoading(true);
       setError(null);
       try {
-        const API_BASE = import.meta.env.VITE_API_BASE_URL;
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
         const res = await fetch(`${API_BASE}/users/${address}/trades`, {
           signal: abort.signal,
           credentials: 'include'
