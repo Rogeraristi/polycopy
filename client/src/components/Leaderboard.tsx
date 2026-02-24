@@ -176,7 +176,7 @@ export function Leaderboard({
                       {formatPercent(entry.roi)}
                     </span>
                   </div>
-                  <dl className="mt-3 grid grid-cols-3 gap-2 text-xs text-slate-400">
+                  <dl className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-400">
                     <div>
                       <dt className="uppercase tracking-wide">P&L</dt>
                       <dd className="font-medium text-slate-200">{formatUsd(entry.pnl)}</dd>
@@ -184,10 +184,6 @@ export function Leaderboard({
                     <div>
                       <dt className="uppercase tracking-wide">Volume</dt>
                       <dd className="font-medium text-slate-200">{formatUsd(entry.volume)}</dd>
-                    </div>
-                    <div>
-                      <dt className="uppercase tracking-wide">Trades</dt>
-                      <dd className="font-medium text-slate-200">{formatNumber(entry.trades)}</dd>
                     </div>
                   </dl>
                   <p className="mt-3 text-xs text-slate-500 break-all">{entry.address}</p>
