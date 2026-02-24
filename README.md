@@ -71,6 +71,7 @@ For the React client (create `client/.env` or `client/.env.local`):
 - `VITE_FIREBASE_MESSAGING_SENDER_ID`
 - `VITE_FIREBASE_APP_ID`
 - `VITE_FIREBASE_MEASUREMENT_ID` (optional, only needed for Analytics)
+- `VITE_ENABLE_BEAMS` (optional, defaults to `false`; set to `true` to enable the heavy Three.js beams effect)
 
 ### Firebase Cloud Functions (optional leaderboard cron)
 

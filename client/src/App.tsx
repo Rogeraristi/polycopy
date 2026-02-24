@@ -14,6 +14,7 @@ import TraderProfile from './pages/TraderProfile';
 import MetallicLogoPreviewPage from './pages/MetallicLogoPreviewPage';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const ENABLE_BEAMS = String(import.meta.env.VITE_ENABLE_BEAMS || 'false').toLowerCase() === 'true';
 const OVERVIEW_PREFETCH_TTL_MS = 1000 * 60 * 3;
 const overviewPrefetchCache = new Map<
   string,
@@ -406,9 +407,11 @@ function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#040712] text-slate-100">
-      <div className="pointer-events-none fixed inset-0 z-0 opacity-65">
-        <Beams beamWidth={2.1} beamHeight={25} beamNumber={50} noiseIntensity={0.15} scale={0.27} rotation={39} speed={1.4} />
-      </div>
+      {ENABLE_BEAMS && (
+        <div className="pointer-events-none fixed inset-0 z-0 opacity-65">
+          <Beams beamWidth={2.1} beamHeight={25} beamNumber={50} noiseIntensity={0.15} scale={0.27} rotation={39} speed={1.4} />
+        </div>
+      )}
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
       <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-14">
         <TopNav
