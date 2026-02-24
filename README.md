@@ -34,6 +34,7 @@ npm run dev --workspace client
 - `POLYMARKET_BASE` – Optional. Polymarket API base URL (defaults to `https://gamma-api.polymarket.com`).
 - `POLYMARKET_DATA_API_BASE` – Optional. Polymarket data API base URL (defaults to `https://data-api.polymarket.com`).
 - `LEADERBOARD_LIMIT` – Optional. Max traders per period served by `/api/leaderboard` (defaults to `12`).
+- `LEADERBOARD_SOURCE_MODE` – Optional. `site_only` (default) scrapes `polymarket.com/leaderboard*` directly; set to `hybrid` to allow data-api/apify fallbacks.
 
 ### Client origins & sessions
 

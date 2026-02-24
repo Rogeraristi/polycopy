@@ -246,18 +246,6 @@ export function Leaderboard({
           <div className="h-52 animate-pulse rounded-2xl border border-slate-800/70 bg-slate-900/60" />
           <div className="h-44 animate-pulse rounded-2xl border border-slate-800/70 bg-slate-900/60" />
         </div>
-        <div className="overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/50">
-          <div className="grid grid-cols-6 gap-2 border-b border-slate-800/60 p-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={`s-head-${i}`} className="h-3 animate-pulse rounded bg-slate-800/80" />
-            ))}
-          </div>
-          <div className="space-y-3 p-4">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={`s-row-${i}`} className="h-8 animate-pulse rounded bg-slate-800/60" />
-            ))}
-          </div>
-        </div>
       </GlassPanel>
     );
   }
@@ -267,7 +255,6 @@ export function Leaderboard({
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
           <h2 className="text-2xl font-semibold text-white">Top Polymarket traders</h2>
-          {/* Only show this heading once for clarity */}
           <p className="text-sm text-slate-400">Click any trader to open their profile and inspect full metrics.</p>
         </div>
         {hasPeriodControls && (
@@ -279,9 +266,7 @@ export function Leaderboard({
                   key={option.key}
                   type="button"
                   onClick={() => {
-                    if (onPeriodChange && !isActive) {
-                      onPeriodChange(option.key);
-                    }
+                    if (onPeriodChange && !isActive) onPeriodChange(option.key);
                   }}
                   aria-pressed={isActive}
                   className={`rounded-full px-3 py-1 transition ${
@@ -329,10 +314,10 @@ export function Leaderboard({
         </button>
       </div>
 
-      {!isLoading && error && <p className="text-sm text-rose-300">{error}</p>}
-      {!isLoading && !error && !hasEntries && <p className="text-sm text-slate-400">No traders match the current filters.</p>}
+      {!error && !hasEntries && <p className="text-sm text-slate-400">No traders match the current filters.</p>}
+      {error && <p className="text-sm text-rose-300">{error}</p>}
 
-      {!isLoading && !error && hasEntries && (
+      {hasEntries && !error && (
         <>
           <div className="grid gap-4 md:grid-cols-3 md:items-end">
             <div className="reveal reveal-1">{second && <PodiumCard entry={second} onSelect={onSelect} onPrefetch={onPrefetch} compact />}</div>
@@ -355,7 +340,7 @@ export function Leaderboard({
               <tbody>
                 {[first, second, third, ...rest].filter(Boolean).map((entry) => {
                   const trader = entry as LeaderboardEntry;
-                  const isSelected = selectedAddress === entry.address;
+                  const isSelected = selectedAddress === trader.address;
                   return (
                     <tr
                       key={trader.address}
@@ -393,11 +378,7 @@ export function Leaderboard({
                           </div>
                         </div>
                       </td>
-                      <td
-                        className={`px-4 py-3 text-right font-semibold ${
-                          trader.roi !== null && trader.roi >= 0 ? 'text-emerald-300' : 'text-rose-300'
-                        }`}
-                      >
+                      <td className={`px-4 py-3 text-right font-semibold ${trader.roi !== null && trader.roi >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
                         {formatPercent(trader.roi)}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-slate-100">{formatUsd(trader.pnl)}</td>

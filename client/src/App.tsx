@@ -407,11 +407,9 @@ function HomePage() {
 
   return (
     <div className="min-h-screen bg-[#040712] text-slate-100">
-      {ENABLE_BEAMS && (
-        <div className="pointer-events-none fixed inset-0 z-0 opacity-65">
-          <Beams beamWidth={2.1} beamHeight={25} beamNumber={50} noiseIntensity={0.15} scale={0.27} rotation={39} speed={1.4} />
-        </div>
-      )}
+      <div className="pointer-events-none fixed inset-0 z-0 opacity-65">
+        <Beams beamWidth={2.1} beamHeight={25} beamNumber={50} noiseIntensity={0.15} scale={0.27} rotation={39} speed={1.4} />
+      </div>
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
       <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-14">
         <div className="sticky top-0 z-30 flex flex-col gap-2 bg-[#040712]/80 backdrop-blur-md transition-all duration-300 shadow-md">
@@ -564,25 +562,26 @@ function LeaderboardPage() {
     <div className="min-h-screen bg-[#040712] text-slate-100">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
       <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-10">
-        <TopNav
-          currentPath="/leaderboard"
-          user={user}
-          isSessionLoading={isSessionLoading}
-          isSessionActionPending={isSessionActionPending}
-          login={login}
-          logout={logout}
-          connectedWallet={connectedWallet}
-          walletChainId={walletChainId}
-          isWalletConnecting={isWalletConnecting}
-          isWalletConnected={isWalletConnected}
-          walletProviderAvailable={walletProviderAvailable}
-          connectWallet={connectWallet}
-          disconnectWallet={disconnectWallet}
-        />
-
-        <GlassPanel className="overflow-hidden rounded-2xl">
-          <BreakingNewsBanner />
-        </GlassPanel>
+        <div className="sticky top-0 z-30 flex flex-col gap-2 bg-[#040712]/80 backdrop-blur-md transition-all duration-300 shadow-md">
+          <TopNav
+            currentPath="/leaderboard"
+            user={user}
+            isSessionLoading={isSessionLoading}
+            isSessionActionPending={isSessionActionPending}
+            login={login}
+            logout={logout}
+            connectedWallet={connectedWallet}
+            walletChainId={walletChainId}
+            isWalletConnecting={isWalletConnecting}
+            isWalletConnected={isWalletConnected}
+            walletProviderAvailable={walletProviderAvailable}
+            connectWallet={connectWallet}
+            disconnectWallet={disconnectWallet}
+          />
+          <GlassPanel className="overflow-hidden rounded-2xl">
+            <BreakingNewsBanner />
+          </GlassPanel>
+        </div>
 
         {(sessionError || walletError) && (
           <GlassPanel className="flex items-start justify-between gap-3 rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
@@ -599,12 +598,7 @@ function LeaderboardPage() {
           </GlassPanel>
         )}
 
-        <section className="space-y-3">
-          <h1 className="text-3xl font-semibold text-white sm:text-4xl">Top Polymarket Traders</h1>
-          <p className="max-w-2xl text-sm text-slate-300">
-            Browse ranked traders by key metrics and click any wallet to inspect full profile details.
-          </p>
-        </section>
+        {/* Removed duplicate heading for clarity */}
 
         <Leaderboard
           entries={activeEntries}

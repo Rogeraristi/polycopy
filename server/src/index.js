@@ -119,6 +119,7 @@ const LEADERBOARD_PERIOD_DATA_ALIASES = {
   all: ['all', 'all_time', 'alltime', 'lifetime']
 };
 const LEADERBOARD_DEFAULT_PERIOD = 'weekly';
+const LEADERBOARD_SOURCE_MODE = (process.env.LEADERBOARD_SOURCE_MODE || 'site_only').toLowerCase();
 const LEADERBOARD_LIMIT = Number.isFinite(Number(process.env.LEADERBOARD_LIMIT))
   ? Math.max(1, Math.min(Number(process.env.LEADERBOARD_LIMIT), 50))
   : 12;
@@ -493,38 +494,75 @@ function normaliseTradesPayload(payload) {
   if (!payload) return [];
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.trades)) return payload.trades;
+  if (Array.isArray(payload.fills)) return payload.fills;
+  if (Array.isArray(payload.activity)) return payload.activity;
+  if (payload?.data && Array.isArray(payload.data?.trades)) return payload.data.trades;
+  if (payload?.data && Array.isArray(payload.data?.fills)) return payload.data.fills;
+  if (payload?.results && Array.isArray(payload.results?.trades)) return payload.results.trades;
+  if (payload?.results && Array.isArray(payload.results?.items)) return payload.results.items;
   return [];
 }
 
 function extractTradeTimestamp(trade) {
-  const raw = trade?.created_at || trade?.createdAt || trade?.timestamp || null;
+  const raw =
+    trade?.created_at ||
+    trade?.createdAt ||
+    trade?.timestamp ||
+    trade?.time ||
+    trade?.executedAt ||
+    trade?.updatedAt ||
+    null;
   if (raw === null) return null;
   const millis = new Date(raw).getTime();
   return Number.isFinite(millis) ? millis : null;
 }
 
 function extractTradeSize(trade) {
-  const numeric = toFiniteNumber(trade?.amount ?? trade?.size ?? trade?.shares ?? trade?.quantity);
+  const numeric = toFiniteNumber(
+    trade?.amount ??
+      trade?.size ??
+      trade?.shares ??
+      trade?.quantity ??
+      trade?.qty ??
+      trade?.filled_size ??
+      trade?.baseAmount
+  );
   return numeric ?? 0;
 }
 
 function extractTradePrice(trade) {
-  const numeric = toFiniteNumber(trade?.price ?? trade?.avgPrice ?? trade?.average_price);
+  const numeric = toFiniteNumber(
+    trade?.price ??
+      trade?.avgPrice ??
+      trade?.average_price ??
+      trade?.avg_price ??
+      trade?.executionPrice ??
+      trade?.fillPrice ??
+      trade?.outcome_price
+  );
   return numeric ?? null;
 }
 
 function extractTradeSide(trade) {
-  const raw = trade?.side || trade?.type || '';
-  return typeof raw === 'string' ? raw.toLowerCase() : '';
+  const raw = trade?.side || trade?.type || trade?.action || trade?.direction || '';
+  const normalized = typeof raw === 'string' ? raw.toLowerCase() : '';
+  if (normalized.includes('buy') || normalized === 'b') return 'buy';
+  if (normalized.includes('sell') || normalized === 's') return 'sell';
+  return normalized;
 }
 
 function extractTradeMarketKey(trade) {
   const market =
     trade?.market_id ||
     trade?.marketId ||
+    trade?.marketID ||
     trade?.conditionId ||
     trade?.token_id ||
     trade?.asset_id ||
+    trade?.clobTokenId ||
     trade?.market?.id ||
     trade?.market?.slug ||
     trade?.market?.question ||
@@ -665,19 +703,38 @@ function filterTradesByPeriod(trades, period) {
 
 async function fetchUserTrades(address, options = {}) {
   const { period = 'all', limit = 150 } = options;
-  const params = new URLSearchParams({
-    account: address,
-    limit: String(Math.max(25, Math.min(Number(limit) || 150, 500)))
-  });
-  const url = `${POLYMARKET_BASE}/trades?${params.toString()}`;
-  try {
-    const payload = await fetchJson(url);
-    const normalized = normaliseTradesPayload(payload);
-    return filterTradesByPeriod(normalized, period);
-  } catch (error) {
-    console.error('Failed to fetch trades', error.message);
+  const resolvedLimit = String(Math.max(25, Math.min(Number(limit) || 150, 500)));
+  const normalizedAddress = String(address || '').trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalizedAddress)) {
     return [];
   }
+
+  const attempts = [
+    `${POLYMARKET_BASE}/trades?${new URLSearchParams({ account: normalizedAddress, limit: resolvedLimit }).toString()}`,
+    `${POLYMARKET_BASE}/trades?${new URLSearchParams({ user: normalizedAddress, limit: resolvedLimit }).toString()}`,
+    `${POLYMARKET_BASE}/trades?${new URLSearchParams({ address: normalizedAddress, limit: resolvedLimit }).toString()}`,
+    `${POLYMARKET_BASE}/activity?${new URLSearchParams({ user: normalizedAddress, limit: resolvedLimit }).toString()}`,
+    `${POLYMARKET_DATA_API_BASE}/trades?${new URLSearchParams({ user: normalizedAddress, limit: resolvedLimit }).toString()}`,
+    `${POLYMARKET_DATA_API_BASE}/trades?${new URLSearchParams({ account: normalizedAddress, limit: resolvedLimit }).toString()}`,
+    `${POLYMARKET_DATA_API_BASE}/activity?${new URLSearchParams({ user: normalizedAddress, limit: resolvedLimit }).toString()}`
+  ];
+
+  for (const url of attempts) {
+    try {
+      const payload = await fetchJson(url);
+      const normalized = normaliseTradesPayload(payload);
+      if (normalized.length > 0) {
+        return filterTradesByPeriod(normalized, period);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/404|not found/i.test(message)) {
+        console.warn(`Trade source failed for ${normalizedAddress}: ${url}`, message);
+      }
+    }
+  }
+
+  return [];
 }
 
 async function fetchMarkets() {
@@ -1284,8 +1341,24 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
         details: null
       };
       try {
-        const dataApiResult = await fetchLeaderboardFromDataApi(periodKey, limit);
-        let entries = dataApiResult.entries;
+        let entries = [];
+        if (LEADERBOARD_SOURCE_MODE !== 'site_only') {
+          const dataApiResult = await fetchLeaderboardFromDataApi(periodKey, limit);
+          entries = dataApiResult.entries;
+          if (entries.length > 0) {
+            diagnostics[periodKey] = {
+              label: config.label,
+              source: 'data-api',
+              count: entries.length,
+              details: {
+                endpoint: dataApiResult.endpoint,
+                alias: dataApiResult.alias,
+                url: dataApiResult.url
+              }
+            };
+          }
+        }
+
         if (entries.length === 0) {
           entries = await fetchLeaderboardFromPath(config.path, limit);
           if (entries.length > 0) {
@@ -1293,20 +1366,9 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
               label: config.label,
               source: 'scrape',
               count: entries.length,
-              details: { path: config.path }
+              details: { path: config.path, mode: LEADERBOARD_SOURCE_MODE }
             };
           }
-        } else {
-          diagnostics[periodKey] = {
-            label: config.label,
-            source: 'data-api',
-            count: entries.length,
-            details: {
-              endpoint: dataApiResult.endpoint,
-              alias: dataApiResult.alias,
-              url: dataApiResult.url
-            }
-          };
         }
         if (entries.length > 0) {
           periods[periodKey] = normaliseAndRank(entries);
@@ -1327,7 +1389,10 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
   // 2) Secondary source: fallback scraper snapshot (usually weekly-like).
   if (Object.keys(periods).length === 0) {
     try {
-      const fallbackEntries = await fetchFallbackLeaderboard(limit);
+      const fallbackEntries =
+        LEADERBOARD_SOURCE_MODE === 'site_only'
+          ? await fetchLeaderboardFromSite(limit)
+          : await fetchFallbackLeaderboard(limit);
       if (fallbackEntries.length > 0) {
         source = 'fallback';
         periods.weekly = normaliseAndRank(fallbackEntries);
@@ -1345,7 +1410,7 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
   }
 
   // 3) Tertiary source: Apify flat snapshot, used only when site paths fail.
-  if (Object.keys(periods).length === 0) {
+  if (Object.keys(periods).length === 0 && LEADERBOARD_SOURCE_MODE !== 'site_only') {
     try {
       const response = await fetch(APIFY_LEADERBOARD_URL);
       if (!response.ok) {
