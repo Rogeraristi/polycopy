@@ -1972,6 +1972,62 @@ async function searchTraders(query, limit = 8) {
   }
 }
 
+function normaliseHandle(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/^@+/, '');
+}
+
+function resolveBestTraderMatch(query, traders) {
+  const normalizedQuery = normaliseHandle(query);
+  if (!normalizedQuery || !Array.isArray(traders) || traders.length === 0) {
+    return null;
+  }
+
+  const isAddressQuery = /^0x[a-f0-9]{40}$/i.test(normalizedQuery);
+
+  const scored = traders
+    .filter((entry) => entry && typeof entry.address === 'string')
+    .map((entry, index) => {
+      const address = String(entry.address || '').toLowerCase();
+      const username = normaliseHandle(entry.username);
+      const pseudonym = normaliseHandle(entry.pseudonym);
+      const displayName = normaliseHandle(entry.displayName);
+
+      let score = 0;
+      if (isAddressQuery && address === normalizedQuery) score += 120;
+      if (username && username === normalizedQuery) score += 100;
+      if (pseudonym && pseudonym === normalizedQuery) score += 95;
+      if (displayName && displayName === normalizedQuery) score += 90;
+      if (username && username.startsWith(normalizedQuery)) score += 60;
+      if (pseudonym && pseudonym.startsWith(normalizedQuery)) score += 55;
+      if (displayName && displayName.startsWith(normalizedQuery)) score += 50;
+      if (address.includes(normalizedQuery)) score += 40;
+      if (username && username.includes(normalizedQuery)) score += 35;
+      if (pseudonym && pseudonym.includes(normalizedQuery)) score += 30;
+      if (displayName && displayName.includes(normalizedQuery)) score += 25;
+
+      if (Number.isFinite(Number(entry.rank))) {
+        score += Math.max(0, 20 - Number(entry.rank));
+      }
+      if (Number.isFinite(Number(entry.pnl))) {
+        score += Math.min(20, Math.max(-20, Number(entry.pnl) / 5000));
+      }
+
+      return { entry, score, index };
+    })
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.index - b.index;
+    });
+
+  if (!scored.length || scored[0].score <= 0) {
+    return null;
+  }
+  return scored[0].entry;
+}
+
 app.get('/api/markets', async (_req, res) => {
   const markets = await fetchMarkets();
   res.json({ markets });
@@ -2246,6 +2302,45 @@ app.get('/api/trader-search', async (req, res) => {
   const parsedLimit = Number.isFinite(Number(limit)) ? Math.max(1, Math.min(Number(limit), 20)) : 8;
   const { traders, error } = await searchTraders(query, parsedLimit);
   res.json({ traders, error });
+});
+
+app.get('/api/trader-resolve', async (req, res) => {
+  const query = typeof req.query?.query === 'string' ? req.query.query : '';
+  const trimmed = query.trim();
+  if (!trimmed) {
+    res.status(400).json({ error: 'query is required' });
+    return;
+  }
+
+  // Fast path for direct wallet lookups.
+  if (/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+    res.json({
+      address: trimmed.toLowerCase(),
+      match: {
+        address: trimmed.toLowerCase(),
+        displayName: `${trimmed.slice(0, 6)}…${trimmed.slice(-4)}`
+      },
+      source: 'address'
+    });
+    return;
+  }
+
+  const { traders, error } = await searchTraders(trimmed, 12);
+  const match = resolveBestTraderMatch(trimmed, traders);
+
+  if (!match) {
+    res.status(404).json({
+      error: error || 'No trader matched that username or wallet query.',
+      query: trimmed
+    });
+    return;
+  }
+
+  res.json({
+    address: String(match.address).toLowerCase(),
+    match,
+    source: 'search'
+  });
 });
 
 // --- Portfolio, Open Orders, and PnL endpoints ---

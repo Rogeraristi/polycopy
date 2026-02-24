@@ -301,6 +301,8 @@ function TopNav({
 function HomePage() {
   const [inputAddress, setInputAddress] = useState('');
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
+  const [isResolvingTrader, setIsResolvingTrader] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
 
   const {
     user,
@@ -332,6 +334,73 @@ function HomePage() {
     const sanitized = address.trim().toLowerCase();
     setSelectedAddress(sanitized || null);
   }, []);
+
+  const resolveAndSelectTrader = useCallback(
+    async (rawValue: string) => {
+      const trimmed = rawValue.trim();
+      if (!trimmed) {
+        setResolveError('Enter a wallet address or username.');
+        return;
+      }
+
+      setResolveError(null);
+      setIsResolvingTrader(true);
+      try {
+        if (/^0x[a-fA-F0-9]{40}$/.test(trimmed)) {
+          const normalized = trimmed.toLowerCase();
+          setInputAddress(normalized);
+          applySelectedAddress(normalized);
+          return;
+        }
+
+        const normalizedQuery = trimmed.toLowerCase().replace(/^@+/, '');
+        const localMatch = suggestions.find((entry) => {
+          const candidates = [
+            entry.address,
+            entry.username ? `@${entry.username}` : null,
+            entry.username || null,
+            entry.pseudonym || null,
+            entry.displayName || null
+          ]
+            .filter(Boolean)
+            .map((value) => String(value).toLowerCase().replace(/^@+/, ''));
+          return candidates.includes(normalizedQuery);
+        });
+
+        if (localMatch?.address) {
+          const normalized = localMatch.address.toLowerCase();
+          setInputAddress(normalized);
+          applySelectedAddress(normalized);
+          return;
+        }
+
+        const params = new URLSearchParams({ query: trimmed });
+        const res = await fetch(`${API_BASE}/trader-resolve?${params.toString()}`, {
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          const payload = await res.json().catch(() => null);
+          throw new Error(payload?.error || `Unable to resolve trader (${res.status})`);
+        }
+
+        const payload = await res.json();
+        const resolvedAddress = String(payload?.address || '').toLowerCase();
+        if (!/^0x[a-f0-9]{40}$/.test(resolvedAddress)) {
+          throw new Error('Resolved trader address is invalid.');
+        }
+
+        setInputAddress(resolvedAddress);
+        applySelectedAddress(resolvedAddress);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unable to resolve trader.';
+        setResolveError(message);
+      } finally {
+        setIsResolvingTrader(false);
+      }
+    },
+    [applySelectedAddress, suggestions]
+  );
 
   const combinedTopError = sessionError || walletError;
 
@@ -387,6 +456,11 @@ function HomePage() {
             {combinedTopError}
           </GlassPanel>
         )}
+        {resolveError && (
+          <GlassPanel className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            {resolveError}
+          </GlassPanel>
+        )}
 
         <section className="grid gap-5 lg:grid-cols-3">
           <GlassPanel className="rounded-3xl p-6 reveal reveal-1">
@@ -410,11 +484,10 @@ function HomePage() {
                 value={inputAddress}
                 onChange={setInputAddress}
                 onSubmit={(nextValue) => {
-                  setInputAddress(nextValue.trim().toLowerCase());
-                  applySelectedAddress(nextValue);
+                  void resolveAndSelectTrader(nextValue);
                 }}
                 suggestions={suggestions}
-                isSearching={isSearchingTraders}
+                isSearching={isSearchingTraders || isResolvingTrader}
                 searchError={traderSearchError}
                 selectedAddress={selectedAddress}
               />
