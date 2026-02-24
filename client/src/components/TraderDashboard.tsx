@@ -217,9 +217,10 @@ export function TraderDashboard({ address }: { address: string }) {
       {/* TODO: Add charts/visualizations here */}
       {isLoading && <div className="text-slate-400 text-center">Loading…</div>}
       {error && <div className="text-rose-400 text-center">{error}</div>}
+
     </section>
   );
-}
+
 
   return (
     <section className="card p-6 space-y-10 mt-6">
