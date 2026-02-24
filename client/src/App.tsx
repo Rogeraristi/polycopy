@@ -177,6 +177,28 @@ export default function App() {
     };
   }, []);
 
+  // Custom smooth scroll with easing
+  const smoothScrollToDashboard = () => {
+    if (!dashboardRef.current) return;
+    const element = dashboardRef.current;
+    const startY = window.scrollY;
+    const endY = element.getBoundingClientRect().top + window.scrollY - 24; // offset for header
+    const duration = 700;
+    const easeInOut = (t) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    let start;
+    function step(timestamp) {
+      if (!start) start = timestamp;
+      const elapsed = timestamp - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = easeInOut(progress);
+      window.scrollTo(0, startY + (endY - startY) * ease);
+      if (progress < 1) {
+        window.requestAnimationFrame(step);
+      }
+    }
+    window.requestAnimationFrame(step);
+  };
+
   const applySelectedAddress = useCallback(
     (address: string, scrollToDashboard?: boolean) => {
       const sanitized = address.trim().toLowerCase();
@@ -184,9 +206,8 @@ export default function App() {
       setSelectedAddress(nextAddress);
       setCopyResult(null);
       setCopyError(null);
-      if (scrollToDashboard && dashboardRef.current) {
-        // Use smooth scroll
-        dashboardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (scrollToDashboard) {
+        smoothScrollToDashboard();
       }
     },
     [setSelectedAddress, setCopyResult, setCopyError]
