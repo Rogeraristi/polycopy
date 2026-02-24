@@ -429,7 +429,7 @@ function HomePage() {
             connectWallet={connectWallet}
             disconnectWallet={disconnectWallet}
           />
-          <GlassPanel className="overflow-hidden rounded-2xl">
+          <GlassPanel advanced className="overflow-hidden rounded-2xl">
             <BreakingNewsBanner />
           </GlassPanel>
         </div>

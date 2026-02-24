@@ -60,7 +60,8 @@ interface MetallicLogoProps {
   animated?: boolean;
 }
 
-export default function MetallicLogo({ src = '/polycopy-logo3.png', size = 64, animated = false }: MetallicLogoProps) {
+// Use the new SVG logo by default
+export default function MetallicLogo({ src = '/poly_copy.svg', size = 64, animated = false }: MetallicLogoProps) {
   const [fallback, setFallback] = React.useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
@@ -175,6 +176,17 @@ export default function MetallicLogo({ src = '/polycopy-logo3.png', size = 64, a
   }, [animated, src, size]);
 
   if (!shouldUseCanvas) {
+    // Render SVG inline for best scaling and color effects
+    if (src.endsWith('.svg')) {
+      return (
+        <object
+          type="image/svg+xml"
+          data={src}
+          aria-label="logo"
+          style={{ width: size, height: size, display: 'block', borderRadius: '50%' }}
+        />
+      );
+    }
     return (
       <img
         src={src}

@@ -506,6 +506,36 @@ function normaliseTradesPayload(payload) {
   return [];
 }
 
+function normaliseTimestampMillis(value) {
+  if (value === null || value === undefined || value === '') return null;
+
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null;
+    const abs = Math.abs(value);
+    if (abs < 1e11) return Math.round(value * 1000); // seconds
+    if (abs > 1e14) return Math.round(value / 1000); // microseconds
+    return Math.round(value); // milliseconds
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const asNumber = Number(trimmed);
+    if (Number.isFinite(asNumber)) {
+      return normaliseTimestampMillis(asNumber);
+    }
+    const parsed = new Date(trimmed).getTime();
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
 function extractTradeTimestamp(trade) {
   const raw =
     trade?.created_at ||
@@ -515,9 +545,7 @@ function extractTradeTimestamp(trade) {
     trade?.executedAt ||
     trade?.updatedAt ||
     null;
-  if (raw === null) return null;
-  const millis = new Date(raw).getTime();
-  return Number.isFinite(millis) ? millis : null;
+  return normaliseTimestampMillis(raw);
 }
 
 function extractTradeSize(trade) {
@@ -572,6 +600,20 @@ function extractTradeMarketKey(trade) {
     return 'unknown';
   }
   return market.trim().toLowerCase();
+}
+
+function extractTradeMarketLabel(trade) {
+  const raw =
+    trade?.market?.question ||
+    trade?.market?.title ||
+    trade?.marketQuestion ||
+    trade?.question ||
+    trade?.title ||
+    (typeof trade?.market === 'string' ? trade.market : null);
+  if (typeof raw === 'string' && raw.trim()) {
+    return raw.trim();
+  }
+  return extractTradeMarketKey(trade);
 }
 
 function computePortfolioSnapshotFromTrades(trades) {

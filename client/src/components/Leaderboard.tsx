@@ -338,16 +338,21 @@ export function Leaderboard({
                 </tr>
               </thead>
               <tbody>
-                {[first, second, third, ...rest].filter(Boolean).map((entry) => {
+                {[first, second, third, ...rest].filter(Boolean).map((entry, idx) => {
                   const trader = entry as LeaderboardEntry;
                   const isSelected = selectedAddress === trader.address;
+                  // Color rows for 1st, 2nd, 3rd
+                  let rowColor = '';
+                  if (trader.rank === 1) rowColor = 'bg-gradient-to-r from-yellow-400/20 to-yellow-200/10';
+                  else if (trader.rank === 2) rowColor = 'bg-gradient-to-r from-slate-200/10 to-slate-400/10';
+                  else if (trader.rank === 3) rowColor = 'bg-gradient-to-r from-amber-700/20 to-amber-400/10';
                   return (
                     <tr
                       key={trader.address}
                       onClick={() => onSelect(trader.address, trader)}
                       onMouseEnter={() => onPrefetch?.(trader.address, trader)}
                       className={`cursor-pointer border-b border-slate-800/40 transition last:border-b-0 ${
-                        isSelected ? 'bg-blue-500/10' : 'hover:bg-slate-800/50'
+                        isSelected ? 'bg-blue-500/10' : rowColor || 'hover:bg-slate-800/50'
                       }`}
                     >
                       <td className="px-4 py-3 font-semibold text-slate-200">#{trader.rank}</td>
