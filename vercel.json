@@ -9,14 +9,10 @@
       }
     }
   ],
-  "redirects": [
-    { "source": "/leaderboard", "destination": "/#/leaderboard", "permanent": false },
-    { "source": "/profile/:address", "destination": "/#/profile/:address", "permanent": false }
-  ],
   "routes": [
+    { "handle": "filesystem" },
+    { "src": "^/leaderboard/?$", "dest": "/index.html" },
+    { "src": "^/profile/[^/]+/?$", "dest": "/index.html" },
     { "src": "/(.*)", "dest": "/index.html" }
-  ],
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
