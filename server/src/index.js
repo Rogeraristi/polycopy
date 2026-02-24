@@ -743,6 +743,8 @@ async function fetchMarkets() {
         liquidity: Number(market.liquidity || 0),
         eventTitle,
         eventSlug,
+        image: market.image || market.icon || null,
+        eventImage: event?.image || event?.icon || null,
         updatedAt: market.updatedAt || event?.updatedAt || null,
         url: canonicalUrl
       };
@@ -939,6 +941,7 @@ function buildBreakingNewsStories(markets, limit = 16) {
         outcomeLabel: market?.primaryOutcome || null,
         marketQuestion: market?.question || null,
         volume24h: score,
+        logoUrl: market?.eventImage || market?.image || null,
         updatedAt: market?.updatedAt || null
       });
       continue;
@@ -952,6 +955,7 @@ function buildBreakingNewsStories(markets, limit = 16) {
         outcomeLabel: market?.primaryOutcome || existing.outcomeLabel,
         marketQuestion: market?.question || existing.marketQuestion,
         volume24h: score,
+        logoUrl: market?.eventImage || market?.image || existing.logoUrl || null,
         updatedAt: market?.updatedAt || existing.updatedAt,
         url:
           (typeof market?.url === 'string' && market.url) ||
@@ -970,6 +974,7 @@ function buildBreakingNewsStories(markets, limit = 16) {
       chance: story.chance,
       outcomeLabel: story.outcomeLabel,
       volume24h: story.volume24h,
+      logoUrl: story.logoUrl || null,
       updatedAt: story.updatedAt
     }));
 }
@@ -1018,6 +1023,7 @@ function buildHeadlineMappedStories(markets, headlines, limit = 10) {
       chance: Number(chance.toFixed(2)),
       outcomeLabel: bestMarket?.primaryOutcome || null,
       volume24h: Number(bestMarket?.volume24h || 0),
+      logoUrl: bestMarket?.eventImage || bestMarket?.image || null,
       updatedAt: bestMarket?.updatedAt || headline.publishedAt || null,
       source: headline.source || 'News'
     });

@@ -12,6 +12,7 @@ interface HeadlineItem {
   volume24h?: number | null;
   eventKey?: string | null;
   source?: string | null;
+  logoUrl?: string | null;
 }
 
 function parseChanceFromMarket(market: any): number | null {
@@ -121,7 +122,8 @@ export default function BreakingNewsBanner() {
             chance,
             outcomeLabel: outcomeText ? `${outcomeText}${chance !== null ? ` ${Math.round(chance)}%` : ''}` : null,
             volume24h: Number.isFinite(Number(m.volume24h)) ? Number(m.volume24h) : null,
-            source: typeof m?.source === 'string' ? m.source : null
+            source: typeof m?.source === 'string' ? m.source : null,
+            logoUrl: typeof m?.logoUrl === 'string' && /^https?:\/\//.test(m.logoUrl) ? m.logoUrl : null
           };
         });
         if (!cancelled) setHeadlines(formatted);
@@ -192,6 +194,14 @@ export default function BreakingNewsBanner() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 hover:underline hover:text-yellow-200 transition-colors"
               >
+                {h.logoUrl && (
+                  <img
+                    src={h.logoUrl}
+                    alt=""
+                    loading="lazy"
+                    className="h-5 w-5 rounded-full object-cover border border-white/25"
+                  />
+                )}
                 <span className="text-white">LIVE</span>
                 <span>{h.text}</span>
                 {h.source && <span className="text-white/80">[{h.source}]</span>}
