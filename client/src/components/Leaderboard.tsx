@@ -1,5 +1,3 @@
-import { useNavigate } from 'react-router-dom';
-
 export interface LeaderboardEntry {
   address: string;
   displayName: string;
@@ -62,7 +60,6 @@ export function Leaderboard({
   selectedPeriod = null,
   onPeriodChange
 }: LeaderboardProps) {
-  const navigate = useNavigate();
   const hasEntries = entries.length > 0;
   const activePeriodLabel = periodOptions.find((option) => option.key === selectedPeriod)?.label ?? null;
   const hasPeriodControls = periodOptions.length > 0;
@@ -143,7 +140,7 @@ export function Leaderboard({
               <li key={`${entry.rank}-${entry.address}`}>
                 <button
                   type="button"
-                  onClick={() => navigate(`/trader/${entry.address}`)}
+                  onClick={() => onSelect(entry.address)}
                   className={`w-full rounded-xl border px-4 py-4 text-left transition ${
                     isSelected
                       ? 'border-primary bg-primary/10 text-white shadow-lg'
