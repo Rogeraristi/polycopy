@@ -54,12 +54,31 @@ function createProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: st
 export default function MetallicLogo({ src = '/polycopy-logo0.png', size = 64 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
+  const shouldAnimateRef = useRef(true);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const reducedMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    shouldAnimateRef.current = !reducedMotion;
+
+    let intersectionObserver: IntersectionObserver | null = null;
+    if (typeof window !== 'undefined' && 'IntersectionObserver' in window) {
+      intersectionObserver = new IntersectionObserver(
+        (entries) => {
+          const entry = entries[0];
+          shouldAnimateRef.current = Boolean(entry?.isIntersecting) && !reducedMotion;
+        },
+        { threshold: 0.01 }
+      );
+      intersectionObserver.observe(canvas);
+    }
+
     const gl = canvas.getContext('webgl');
-    if (!gl) return;
+    if (!gl) {
+      intersectionObserver?.disconnect();
+      return;
+    }
 
     // Setup shaders and program
     const program = createProgram(gl, vertexShaderSource, fragmentShaderSource);
@@ -91,6 +110,10 @@ export default function MetallicLogo({ src = '/polycopy-logo0.png', size = 64 })
 
       // Animation loop
       function render(time: number) {
+        if (!shouldAnimateRef.current) {
+          animationRef.current = requestAnimationFrame(render);
+          return;
+        }
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.uniform1f(gl.getUniformLocation(program, 'u_time'), time * 0.001);
@@ -101,6 +124,7 @@ export default function MetallicLogo({ src = '/polycopy-logo0.png', size = 64 })
     };
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      intersectionObserver?.disconnect();
     };
   }, [src, size]);
 
