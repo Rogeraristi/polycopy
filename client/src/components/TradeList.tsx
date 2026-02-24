@@ -33,17 +33,20 @@ export function TradeList({ trades, onCopy, isCopying, canCopy = true }: TradeLi
   const [sortKey, setSortKey] = React.useState<'date' | 'size' | 'price'>('date');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [filterText, setFilterText] = React.useState('');
-  const fallbackAvatars = [
-    require('../assets/profile1.png'),
-    require('../assets/profile2.png'),
-    require('../assets/profile3.png'),
-    require('../assets/profile4.png'),
-    require('../assets/profile5.png'),
-    require('../assets/profile6.png'),
-    require('../assets/profile7.png'),
-    require('../assets/profile8.png'),
-    require('../assets/profile9.png'),
-  ];
+  function generateAvatar(address: string) {
+    const color = `hsl(${address.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360}, 70%, 55%)`;
+    const initials = address.slice(2, 4).toUpperCase();
+    const svg = `<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'>
+      <defs>
+        <filter id='shadow' x='-20%' y='-20%' width='140%' height='140%'>
+          <feDropShadow dx='0' dy='2' stdDeviation='2' flood-color='#000' flood-opacity='0.18'/>
+        </filter>
+      </defs>
+      <circle cx='32' cy='32' r='30' fill='${color}' stroke='white' stroke-width='4' filter='url(#shadow)'/>
+      <text x='50%' y='54%' text-anchor='middle' font-size='28' font-family='Inter,Arial,sans-serif' font-weight='bold' fill='#fff' dy='.3em'>${initials}</text>
+    </svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg.replace(/\n\s+/g, ''))}`;
+  }
 
   const sortedTrades = [...trades].filter(trade => {
     if (!filterText) return true;
@@ -112,12 +115,10 @@ export function TradeList({ trades, onCopy, isCopying, canCopy = true }: TradeLi
         const side = (trade.side || trade.type || '').toUpperCase();
         const price = Number(trade.price ?? 0);
         const size = Number(trade.amount || trade.size || trade.shares || 0);
-        // Cycle fallback avatars by address hash
         let avatar = trade.avatarUrl;
         const address = trade.account || trade.user || trade.wallet || '';
         if (!avatar) {
-          const hash = Array.from(address).reduce((acc, c) => acc + c.charCodeAt(0), 0);
-          avatar = fallbackAvatars[hash % fallbackAvatars.length];
+          avatar = generateAvatar(address);
         }
         const username = trade.username || address || 'unknown';
 

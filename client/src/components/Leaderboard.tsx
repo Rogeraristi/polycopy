@@ -65,18 +65,21 @@ export function Leaderboard({
   const hasPeriodControls = periodOptions.length > 0;
 
   // Fallback avatar
-  // Load fallback avatars
-  const fallbackAvatars = [
-    require('../assets/profile1.png'),
-    require('../assets/profile2.png'),
-    require('../assets/profile3.png'),
-    require('../assets/profile4.png'),
-    require('../assets/profile5.png'),
-    require('../assets/profile6.png'),
-    require('../assets/profile7.png'),
-    require('../assets/profile8.png'),
-    require('../assets/profile9.png'),
-  ];
+  // Generate a simple base64 SVG avatar as fallback
+  function generateAvatar(address: string) {
+    const color = `hsl(${address.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360}, 70%, 55%)`;
+    const initials = address.slice(2, 4).toUpperCase();
+    const svg = `<svg width='64' height='64' xmlns='http://www.w3.org/2000/svg'>
+      <defs>
+        <filter id='shadow' x='-20%' y='-20%' width='140%' height='140%'>
+          <feDropShadow dx='0' dy='2' stdDeviation='2' flood-color='#000' flood-opacity='0.18'/>
+        </filter>
+      </defs>
+      <circle cx='32' cy='32' r='30' fill='${color}' stroke='white' stroke-width='4' filter='url(#shadow)'/>
+      <text x='50%' y='54%' text-anchor='middle' font-size='28' font-family='Inter,Arial,sans-serif' font-weight='bold' fill='#fff' dy='.3em'>${initials}</text>
+    </svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg.replace(/\n\s+/g, ''))}`;
+  }
   return (
     <section className="card p-6 space-y-4">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -129,11 +132,9 @@ export function Leaderboard({
         <ul className="grid gap-3 md:grid-cols-2">
           {entries.map((entry) => {
             const isSelected = selectedAddress === entry.address;
-            // Cycle fallback avatars by address hash
             let avatar = entry.avatarUrl;
             if (!avatar) {
-              const hash = Array.from(entry.address).reduce((acc, c) => acc + c.charCodeAt(0), 0);
-              avatar = fallbackAvatars[hash % fallbackAvatars.length];
+              avatar = generateAvatar(entry.address);
             }
             return (
               <li key={`${entry.rank}-${entry.address}`}>
