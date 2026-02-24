@@ -51,7 +51,26 @@ function createProgram(gl: WebGLRenderingContext, vsSource: string, fsSource: st
   return program;
 }
 
-export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64 }) {
+interface MetallicLogoProps {
+  src?: string;
+  size?: number;
+  animated?: boolean;
+}
+
+export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64, animated = false }: MetallicLogoProps) {
+  if (!animated) {
+    return (
+      <img
+        src={src}
+        alt="logo"
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        className="rounded-full object-cover"
+        style={{ width: size, height: size, display: 'block' }}
+      />
+    );
+  }
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>();
   const shouldAnimateRef = useRef(true);
@@ -129,6 +148,17 @@ export default function MetallicLogo({ src = '/polycopy-logo.png', size = 64 }) 
   }, [src, size]);
 
   return (
-    <canvas ref={canvasRef} width={size} height={size} style={{ width: size, height: size, display: 'block' }} />
+    <canvas
+      ref={canvasRef}
+      width={size}
+      height={size}
+      style={{
+        width: size,
+        height: size,
+        display: 'block',
+        background: '#000', // Black background for black mscreen effect
+        borderRadius: '50%',
+      }}
+    />
   );
 }

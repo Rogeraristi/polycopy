@@ -7,11 +7,6 @@ interface HeadlineItem {
   text: string;
   url: string;
   chance: number | null;
-  outcomeLabel?: string | null;
-  updatedAt?: string | null;
-  volume24h?: number | null;
-  eventKey?: string | null;
-  source?: string | null;
   logoUrl?: string | null;
 }
 
@@ -120,10 +115,11 @@ export default function BreakingNewsBanner() {
             text: String(m.title || m.question || 'Polymarket market'),
             url: resolvedUrl,
             chance,
-            outcomeLabel: outcomeText ? `${outcomeText}${chance !== null ? ` ${Math.round(chance)}%` : ''}` : null,
-            volume24h: Number.isFinite(Number(m.volume24h)) ? Number(m.volume24h) : null,
-            source: typeof m?.source === 'string' ? m.source : null,
-            logoUrl: typeof m?.logoUrl === 'string' && /^https?:\/\//.test(m.logoUrl) ? m.logoUrl : null
+            logoUrl:
+              (typeof m?.logoUrl === 'string' && /^https?:\/\//.test(m.logoUrl) && m.logoUrl) ||
+              (typeof m?.eventImage === 'string' && /^https?:\/\//.test(m.eventImage) && m.eventImage) ||
+              (typeof m?.image === 'string' && /^https?:\/\//.test(m.image) && m.image) ||
+              '/polycopy-logo3.png'
           };
         });
         if (!cancelled) setHeadlines(formatted);
@@ -199,19 +195,15 @@ export default function BreakingNewsBanner() {
                     src={h.logoUrl}
                     alt=""
                     loading="lazy"
+                    referrerPolicy="no-referrer"
                     className="h-5 w-5 rounded-full object-cover border border-white/25"
                   />
                 )}
                 <span className="text-white">LIVE</span>
                 <span>{h.text}</span>
-                {h.source && <span className="text-white/80">[{h.source}]</span>}
                 <span className={`font-semibold ${h.chance !== null && h.chance >= 50 ? 'text-emerald-200' : 'text-rose-200'}`}>
                   {h.chance === null ? 'N/A chance' : `${Math.round(h.chance)}% chance`}
                 </span>
-                {h.outcomeLabel && <span className="text-amber-100/95">{h.outcomeLabel}</span>}
-                {typeof h.volume24h === 'number' && Number.isFinite(h.volume24h) && (
-                  <span className="text-blue-100/90">${Math.round(h.volume24h).toLocaleString()} 24h vol</span>
-                )}
               </a>
             ))
           )}

@@ -10,6 +10,7 @@ import { useSession } from './hooks/useSession';
 import { useTraderSearch } from './hooks/useTraderSearch';
 import { useWalletConnection } from './hooks/useWalletConnection';
 import TraderProfile from './pages/TraderProfile';
+import MetallicLogoPreviewPage from './pages/MetallicLogoPreviewPage';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -452,6 +453,7 @@ export default function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
         <Route path="/profile/:address" element={<TraderProfile />} />
+        <Route path="/logo-preview" element={<MetallicLogoPreviewPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

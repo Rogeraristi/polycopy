@@ -743,8 +743,8 @@ async function fetchMarkets() {
         liquidity: Number(market.liquidity || 0),
         eventTitle,
         eventSlug,
-        image: market.image || market.icon || null,
-        eventImage: event?.image || event?.icon || null,
+        image: pickFirstAbsoluteUrl(market.image, market.icon),
+        eventImage: pickFirstAbsoluteUrl(event?.image, event?.icon),
         updatedAt: market.updatedAt || event?.updatedAt || null,
         url: canonicalUrl
       };
@@ -776,6 +776,36 @@ function decodeHtmlEntities(value) {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
+}
+
+function pickFirstAbsoluteUrl(...candidates) {
+  for (const candidate of candidates) {
+    if (typeof candidate !== 'string') continue;
+    const value = candidate.trim();
+    if (/^https?:\/\//i.test(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function resolveMarketLogo(market, fallbackUrl = null, fallbackSource = 'fallback') {
+  const eventImage = pickFirstAbsoluteUrl(market?.eventImage);
+  if (eventImage) {
+    return { url: eventImage, source: 'eventImage' };
+  }
+
+  const marketImage = pickFirstAbsoluteUrl(market?.image);
+  if (marketImage) {
+    return { url: marketImage, source: 'marketImage' };
+  }
+
+  const fallback = pickFirstAbsoluteUrl(fallbackUrl);
+  if (fallback) {
+    return { url: fallback, source: fallbackSource };
+  }
+
+  return { url: null, source: null };
 }
 
 function stripTags(value) {
@@ -927,6 +957,7 @@ function buildBreakingNewsStories(markets, limit = 16) {
     const score = Math.max(volume24h, eventVolume24h);
 
     const existing = groupedByEvent.get(eventKey);
+    const logo = resolveMarketLogo(market);
     if (!existing) {
       groupedByEvent.set(eventKey, {
         eventKey,
@@ -941,7 +972,8 @@ function buildBreakingNewsStories(markets, limit = 16) {
         outcomeLabel: market?.primaryOutcome || null,
         marketQuestion: market?.question || null,
         volume24h: score,
-        logoUrl: market?.eventImage || market?.image || null,
+        logoUrl: logo.url,
+        logoSource: logo.source,
         updatedAt: market?.updatedAt || null
       });
       continue;
@@ -949,13 +981,15 @@ function buildBreakingNewsStories(markets, limit = 16) {
 
     // Keep the highest-volume market representation for each event.
     if (score > existing.volume24h) {
+      const nextLogo = resolveMarketLogo(market, existing.logoUrl, existing.logoSource || 'fallback');
       groupedByEvent.set(eventKey, {
         ...existing,
         chance: Number(chance.toFixed(2)),
         outcomeLabel: market?.primaryOutcome || existing.outcomeLabel,
         marketQuestion: market?.question || existing.marketQuestion,
         volume24h: score,
-        logoUrl: market?.eventImage || market?.image || existing.logoUrl || null,
+        logoUrl: nextLogo.url,
+        logoSource: nextLogo.source,
         updatedAt: market?.updatedAt || existing.updatedAt,
         url:
           (typeof market?.url === 'string' && market.url) ||
@@ -974,7 +1008,8 @@ function buildBreakingNewsStories(markets, limit = 16) {
       chance: story.chance,
       outcomeLabel: story.outcomeLabel,
       volume24h: story.volume24h,
-      logoUrl: story.logoUrl || null,
+      logoUrl: pickFirstAbsoluteUrl(story.logoUrl),
+      logoSource: story.logoSource || null,
       updatedAt: story.updatedAt
     }));
 }
@@ -1011,6 +1046,7 @@ function buildHeadlineMappedStories(markets, headlines, limit = 10) {
       toFiniteNumber(bestMarket?.chance) ??
       null;
     if (chance === null) continue;
+    const logo = resolveMarketLogo(bestMarket);
 
     mapped.push({
       title: headline.title,
@@ -1023,7 +1059,8 @@ function buildHeadlineMappedStories(markets, headlines, limit = 10) {
       chance: Number(chance.toFixed(2)),
       outcomeLabel: bestMarket?.primaryOutcome || null,
       volume24h: Number(bestMarket?.volume24h || 0),
-      logoUrl: bestMarket?.eventImage || bestMarket?.image || null,
+      logoUrl: logo.url,
+      logoSource: logo.source,
       updatedAt: bestMarket?.updatedAt || headline.publishedAt || null,
       source: headline.source || 'News'
     });
