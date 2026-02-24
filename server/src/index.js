@@ -1,35 +1,4 @@
-// --- Portfolio, Open Orders, and PnL endpoints ---
-// GET /api/users/:address/portfolio
-app.get('/api/users/:address/portfolio', async (req, res) => {
-  const { address } = req.params;
-  try {
-    const value = await fetchUserTotalPositionValue(address);
-    res.json({ address, portfolioValue: value });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch portfolio value' });
-  }
-});
 
-// GET /api/users/:address/pnl
-app.get('/api/users/:address/pnl', async (req, res) => {
-  const { address } = req.params;
-  try {
-    // For demo: use leaderboard logic to get PnL if available
-    // Or fetch trades and sum up realized PnL if available in trade data
-    // Here, just return null or fake value
-    // TODO: Replace with real calculation if available
-    res.json({ address, pnl: null });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch PnL' });
-  }
-});
-
-// GET /api/users/:address/open-orders
-app.get('/api/users/:address/open-orders', async (req, res) => {
-  // Polymarket API does not expose open orders directly; this is a placeholder
-  // TODO: Integrate with real open orders if available
-  res.json({ openOrders: [] });
-});
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
@@ -759,8 +728,7 @@ function normaliseTraderSearchResults(payload, limit = 8) {
         entry.pseudonym ||
         entry.handle ||
         (normalisedAddress.length > 10
-          ? `${normalisedAddress.slice(0, 6)}…${normalisedAddress.slice(-4)}`
-          : normalisedAddress);
+          ? `${normalisedAddress.slice(0, 6)}…${normalisedAddress.slice(-4)}` : normalisedAddress);
 
       const metrics = entry.metrics || entry.stats || {};
       const extraStats = entry.stats && entry.stats !== metrics ? entry.stats : {};
