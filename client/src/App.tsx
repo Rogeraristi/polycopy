@@ -151,26 +151,26 @@ function TopNav({
   }, [walletProviderAvailable, isWalletConnected, disconnectWallet, connectWallet]);
 
   return (
-    <header className="rounded-2xl border border-slate-800/70 bg-slate-950/70 px-6 py-4 backdrop-blur">
+    <header className="rounded-2xl border border-[#1f2d4d] bg-[#0a1122cc] px-6 py-4 backdrop-blur">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-8">
           <Link to="/" className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400" />
+            <img src="/polycopy-logo3.png" alt="PolyCopy logo" className="h-10 w-10 rounded-xl border border-[#2a3f66] bg-[#0a1226] p-1" />
             <div>
-              <p className="text-sm font-semibold tracking-wide text-white">PolyCopy</p>
-              <p className="text-xs text-slate-400">Built for Polymarket</p>
+              <p className="brand-heading text-sm font-semibold tracking-wide text-white">POLYCOPY</p>
+              <p className="text-xs text-[#8fa5cb]">Copy smarter on Polymarket</p>
             </div>
           </Link>
-          <nav className="hidden md:flex items-center gap-6 text-sm text-slate-300">
+          <nav className="hidden md:flex items-center gap-6 text-sm text-[#9bb0d5]">
             <Link
               to="/"
-              className={`transition ${currentPath === '/' ? 'text-white' : 'hover:text-white text-slate-300'}`}
+              className={`transition ${currentPath === '/' ? 'text-white' : 'hover:text-white text-[#9bb0d5]'}`}
             >
               Home
             </Link>
             <Link
               to="/leaderboard"
-              className={`transition ${currentPath === '/leaderboard' ? 'text-white' : 'hover:text-white text-slate-300'}`}
+              className={`transition ${currentPath === '/leaderboard' ? 'text-white' : 'hover:text-white text-[#9bb0d5]'}`}
             >
               Leaderboard
             </Link>
@@ -181,7 +181,7 @@ function TopNav({
             type="button"
             onClick={handleSessionClick}
             disabled={(Boolean(user) && (isSessionLoading || isSessionActionPending)) || isSessionActionPending}
-            className="rounded-full border border-slate-700/80 bg-slate-900/80 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:opacity-60"
+            className="rounded-full border border-[#2b4068] bg-[#0c1730cc] px-4 py-2 text-sm font-semibold text-[#d8e6ff] transition hover:border-[#4d709e] disabled:opacity-60"
           >
             {user ? (isSessionLoading ? 'Loading...' : 'Sign out') : 'Sign in'}
           </button>
@@ -189,11 +189,11 @@ function TopNav({
             type="button"
             onClick={handleWalletClick}
             disabled={isWalletConnecting || !walletProviderAvailable}
-            className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
+            className="rounded-full bg-gradient-to-r from-[#21c4c4] to-[#0dd3a8] px-4 py-2 text-sm font-semibold text-[#032021] transition hover:brightness-105 disabled:opacity-60"
           >
             {isWalletConnecting ? 'Connecting...' : isWalletConnected ? shortAddress(connectedWallet) : 'Connect Wallet'}
           </button>
-          {isWalletConnected && walletChainId && <span className="text-xs text-slate-400">Chain {walletChainId}</span>}
+          {isWalletConnected && walletChainId && <span className="text-xs text-[#8fa5cb]">Chain {walletChainId}</span>}
         </div>
       </div>
     </header>
@@ -238,8 +238,8 @@ function HomePage() {
   const combinedTopError = sessionError || walletError;
 
   return (
-    <div className="min-h-screen bg-[#040712] text-slate-100">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
+    <div className="brand-grid min-h-screen text-slate-100">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(33,196,196,0.2),transparent_55%)]" />
       <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-14">
         <TopNav
           currentPath="/"
@@ -258,20 +258,20 @@ function HomePage() {
         />
 
         <section className="text-center space-y-5 reveal">
-          <p className="inline-flex rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-blue-200">
-            Polymarket Intelligence
+          <p className="inline-flex rounded-full border border-[#2f4e7a] bg-[#13325e66] px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#9ed8e8]">
+            New Brand Experience
           </p>
-          <h1 className="mx-auto max-w-4xl text-2xl font-semibold leading-tight text-white sm:text-4xl">
-            Discover top traders and track your own portfolio with confidence
+          <h1 className="brand-heading mx-auto max-w-4xl text-2xl font-semibold leading-tight text-white sm:text-4xl">
+            Track elite conviction and build your edge with PolyCopy
           </h1>
-          <p className="mx-auto max-w-2xl text-base text-slate-300 sm:text-lg">
-            Track your own portfolio and analyze other traders before deciding who to follow.
+          <p className="mx-auto max-w-2xl text-base text-[#a8bbdf] sm:text-lg">
+            Follow verified market leaders, audit your own performance, and execute with higher confidence.
           </p>
           <div className="flex justify-center gap-3">
-            <Link to="/leaderboard" className="rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">
+            <Link to="/leaderboard" className="brand-button px-6 py-3">
               View Top Traders
             </Link>
-            <a href="#search" className="rounded-full border border-slate-600 px-6 py-3 text-sm font-semibold text-slate-100 transition hover:border-slate-400">
+            <a href="#search" className="brand-outline-button px-6 py-3">
               Search Traders
             </a>
           </div>
@@ -282,19 +282,19 @@ function HomePage() {
         )}
 
         <section className="grid gap-5 lg:grid-cols-3">
-          <article className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 reveal reveal-1">
-            <p className="text-xs uppercase tracking-wide text-blue-200">Leaderboard</p>
-            <h2 className="mt-3 text-2xl font-semibold text-white">Follow the most successful traders</h2>
-            <p className="mt-3 text-sm text-slate-300">Open the leaderboard to compare PnL, ROI, and volume at a glance.</p>
-            <Link to="/leaderboard" className="mt-5 inline-flex rounded-full bg-white px-5 py-2 text-sm font-semibold text-slate-900">
+          <article className="card p-6 reveal reveal-1">
+            <p className="text-xs uppercase tracking-wide text-[#9ed8e8]">Leaderboard</p>
+            <h2 className="brand-heading mt-3 text-2xl font-semibold text-white">Follow the most successful traders</h2>
+            <p className="mt-3 text-sm text-[#a8bbdf]">Open the leaderboard to compare PnL, ROI, and volume at a glance.</p>
+            <Link to="/leaderboard" className="brand-button mt-5 inline-flex">
               Open Leaderboard
             </Link>
           </article>
 
-          <article id="search" className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 reveal reveal-2">
-            <p className="text-xs uppercase tracking-wide text-blue-200">Search Traders</p>
-            <h2 className="mt-3 text-2xl font-semibold text-white">Analyze any wallet</h2>
-            <p className="mt-3 text-sm text-slate-300">Search by wallet or username and inspect the trader profile instantly.</p>
+          <article id="search" className="card p-6 reveal reveal-2">
+            <p className="text-xs uppercase tracking-wide text-[#9ed8e8]">Search Traders</p>
+            <h2 className="brand-heading mt-3 text-2xl font-semibold text-white">Analyze any wallet</h2>
+            <p className="mt-3 text-sm text-[#a8bbdf]">Search by wallet or username and inspect the trader profile instantly.</p>
             <div className="mt-5">
               <TraderSearch
                 value={inputAddress}
@@ -311,17 +311,17 @@ function HomePage() {
             </div>
           </article>
 
-          <article className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 reveal reveal-3">
-            <p className="text-xs uppercase tracking-wide text-blue-200">Portfolio View</p>
-            <h2 className="mt-3 text-2xl font-semibold text-white">Track your own edge</h2>
-            <p className="mt-3 text-sm text-slate-300">Compare your process with top traders and refine your strategy over time.</p>
-            <div className="mt-5 rounded-2xl border border-slate-700/70 bg-slate-900/60 p-4">
-              <p className="text-xs uppercase text-slate-400">Selected trader</p>
-              <p className="mt-1 font-mono text-sm text-slate-100 break-all">{selectedAddress || 'No trader selected yet'}</p>
+          <article className="card p-6 reveal reveal-3">
+            <p className="text-xs uppercase tracking-wide text-[#9ed8e8]">Portfolio View</p>
+            <h2 className="brand-heading mt-3 text-2xl font-semibold text-white">Track your own edge</h2>
+            <p className="mt-3 text-sm text-[#a8bbdf]">Compare your process with top traders and refine your strategy over time.</p>
+            <div className="mt-5 rounded-2xl border border-[#2b4068] bg-[#0c1730aa] p-4">
+              <p className="text-xs uppercase text-[#86a2cf]">Selected trader</p>
+              <p className="mt-1 font-mono text-sm text-[#e5efff] break-all">{selectedAddress || 'No trader selected yet'}</p>
               {selectedAddress && (
                 <Link
                   to={`/profile/${selectedAddress}`}
-                  className="mt-3 inline-flex rounded-full border border-blue-400/50 px-4 py-2 text-xs font-semibold text-blue-200"
+                  className="brand-outline-button mt-3 inline-flex px-4 py-2 text-xs"
                 >
                   View trader profile
                 </Link>
@@ -364,8 +364,8 @@ function LeaderboardPage() {
   const { activeEntries, periodOptions, selectedPeriod, onPeriodChange, isLoading, error } = useLeaderboardData();
 
   return (
-    <div className="min-h-screen bg-[#040712] text-slate-100">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
+    <div className="brand-grid min-h-screen text-slate-100">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(33,196,196,0.2),transparent_55%)]" />
       <div className="relative mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-10">
         <TopNav
           currentPath="/leaderboard"
@@ -383,7 +383,7 @@ function LeaderboardPage() {
           disconnectWallet={disconnectWallet}
         />
 
-        <div className="overflow-hidden rounded-2xl border border-slate-800/60">
+        <div className="overflow-hidden rounded-2xl border border-[#1f2d4d]">
           <BreakingNewsBanner />
         </div>
 
@@ -403,9 +403,9 @@ function LeaderboardPage() {
         )}
 
         <section className="space-y-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-blue-200">Leaderboard</p>
-          <h1 className="text-3xl font-semibold text-white sm:text-4xl">Top Polymarket Traders</h1>
-          <p className="max-w-2xl text-sm text-slate-300">
+          <p className="text-xs uppercase tracking-[0.2em] text-[#9ed8e8]">Leaderboard</p>
+          <h1 className="brand-heading text-3xl font-semibold text-white sm:text-4xl">Top Polymarket Traders</h1>
+          <p className="max-w-2xl text-sm text-[#a8bbdf]">
             Browse ranked traders by key metrics and click any wallet to inspect full profile details.
           </p>
         </section>

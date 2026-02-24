@@ -88,10 +88,10 @@ function PodiumCard({
       onClick={() => onSelect(entry.address)}
       className={`w-full rounded-2xl border p-4 text-left transition ${
         emphasized
-          ? 'border-amber-300/50 bg-gradient-to-b from-amber-500/15 to-slate-900/80 shadow-lg shadow-amber-500/20'
+          ? 'border-amber-300/60 bg-gradient-to-b from-amber-400/20 to-[#0c1324] shadow-lg shadow-amber-500/20'
           : compact
-          ? 'border-slate-700/70 bg-slate-900/80 hover:border-slate-500'
-          : 'border-slate-700/70 bg-slate-900/70 hover:border-slate-500'
+          ? 'border-[#2b4068] bg-[#0c1730cc] hover:border-[#4d709e]'
+          : 'border-[#2b4068] bg-[#0c1730b3] hover:border-[#4d709e]'
       }`}
     >
       <div className="flex items-center justify-between">
@@ -106,18 +106,18 @@ function PodiumCard({
         />
         <div className="min-w-0">
           <p className={`${emphasized ? 'text-base' : 'text-sm'} truncate font-semibold text-white`}>{entry.displayName}</p>
-          <p className="truncate text-xs text-slate-400">{entry.address}</p>
+          <p className="truncate text-xs text-[#8fa5cb]">{entry.address}</p>
         </div>
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-2 text-xs">
         <div>
-          <dt className="text-slate-400">ROI</dt>
+          <dt className="text-[#8fa5cb]">ROI</dt>
           <dd className={`${entry.roi !== null && entry.roi >= 0 ? 'text-emerald-300' : 'text-rose-300'} font-semibold`}>
             {formatPercent(entry.roi)}
           </dd>
         </div>
         <div>
-          <dt className="text-slate-400">P&L</dt>
+          <dt className="text-[#8fa5cb]">P&L</dt>
           <dd className="font-semibold text-slate-100">{formatUsd(entry.pnl)}</dd>
         </div>
       </dl>
@@ -176,25 +176,25 @@ export function Leaderboard({
 
   if (isLoading) {
     return (
-      <section className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 space-y-6">
+      <section className="card p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <div className="h-8 w-56 animate-pulse rounded bg-slate-800/80" />
-          <div className="h-8 w-40 animate-pulse rounded-full bg-slate-800/80" />
+          <div className="h-8 w-56 animate-pulse rounded bg-[#15233f]" />
+          <div className="h-8 w-40 animate-pulse rounded-full bg-[#15233f]" />
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="h-44 animate-pulse rounded-2xl border border-slate-800/70 bg-slate-900/60" />
-          <div className="h-52 animate-pulse rounded-2xl border border-slate-800/70 bg-slate-900/60" />
-          <div className="h-44 animate-pulse rounded-2xl border border-slate-800/70 bg-slate-900/60" />
+          <div className="h-44 animate-pulse rounded-2xl border border-[#26395f] bg-[#101c35cc]" />
+          <div className="h-52 animate-pulse rounded-2xl border border-[#26395f] bg-[#101c35cc]" />
+          <div className="h-44 animate-pulse rounded-2xl border border-[#26395f] bg-[#101c35cc]" />
         </div>
-        <div className="overflow-hidden rounded-2xl border border-slate-800/60 bg-slate-900/50">
-          <div className="grid grid-cols-6 gap-2 border-b border-slate-800/60 p-4">
+        <div className="overflow-hidden rounded-2xl border border-[#26395f] bg-[#101c35cc]">
+          <div className="grid grid-cols-6 gap-2 border-b border-[#26395f] p-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={`s-head-${i}`} className="h-3 animate-pulse rounded bg-slate-800/80" />
+              <div key={`s-head-${i}`} className="h-3 animate-pulse rounded bg-[#15233f]" />
             ))}
           </div>
           <div className="space-y-3 p-4">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={`s-row-${i}`} className="h-8 animate-pulse rounded bg-slate-800/60" />
+              <div key={`s-row-${i}`} className="h-8 animate-pulse rounded bg-[#15233f]" />
             ))}
           </div>
         </div>
@@ -203,14 +203,14 @@ export function Leaderboard({
   }
 
   return (
-    <section className="rounded-3xl border border-slate-800/60 bg-slate-950/70 p-6 space-y-6">
+    <section className="card p-6 space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
-          <h2 className="text-2xl font-semibold text-white">Top Polymarket traders</h2>
-          <p className="text-sm text-slate-400">Click any trader to open their profile and inspect full metrics.</p>
+          <h2 className="brand-heading text-2xl font-semibold text-white">Top Polymarket traders</h2>
+          <p className="text-sm text-[#8fa5cb]">Click any trader to open their profile and inspect full metrics.</p>
         </div>
         {hasPeriodControls && (
-          <nav className="flex shrink-0 items-center gap-1 rounded-full border border-slate-800/60 bg-slate-900/60 p-1 text-xs font-medium text-slate-300">
+          <nav className="flex shrink-0 items-center gap-1 rounded-full border border-[#26395f] bg-[#101c35cc] p-1 text-xs font-medium text-[#9bb0d5]">
             {periodOptions.map((option) => {
               const isActive = option.key === selectedPeriod;
               return (
@@ -224,7 +224,7 @@ export function Leaderboard({
                   }}
                   aria-pressed={isActive}
                   className={`rounded-full px-3 py-1 transition ${
-                    isActive ? 'bg-blue-600 text-white shadow shadow-blue-500/30' : 'hover:bg-slate-800/70'
+                    isActive ? 'bg-gradient-to-r from-[#21c4c4] to-[#0dd3a8] text-[#032021] shadow shadow-[#21c4c455]' : 'hover:bg-[#15233f]'
                   }`}
                 >
                   {option.label}
@@ -235,13 +235,13 @@ export function Leaderboard({
         )}
       </header>
 
-      <div className="grid gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-3 md:grid-cols-[minmax(0,1fr),130px,130px,auto]">
+      <div className="grid gap-3 rounded-2xl border border-[#26395f] bg-[#101c35b3] p-3 md:grid-cols-[minmax(0,1fr),130px,130px,auto]">
         <input
           type="text"
           placeholder="Filter by trader name, username, or wallet"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          className="rounded-xl border border-slate-700/80 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+          className="rounded-xl border border-[#2b4068] bg-[#0c1730cc] px-3 py-2 text-sm text-[#e5efff] placeholder:text-[#6f88b2]"
         />
         <input
           type="number"
@@ -249,7 +249,7 @@ export function Leaderboard({
           placeholder="Min ROI %"
           value={minRoiInput}
           onChange={(event) => setMinRoiInput(event.target.value)}
-          className="rounded-xl border border-slate-700/80 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+          className="rounded-xl border border-[#2b4068] bg-[#0c1730cc] px-3 py-2 text-sm text-[#e5efff] placeholder:text-[#6f88b2]"
         />
         <input
           type="number"
@@ -257,19 +257,19 @@ export function Leaderboard({
           placeholder="Min P&L"
           value={minPnlInput}
           onChange={(event) => setMinPnlInput(event.target.value)}
-          className="rounded-xl border border-slate-700/80 bg-slate-900/80 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+          className="rounded-xl border border-[#2b4068] bg-[#0c1730cc] px-3 py-2 text-sm text-[#e5efff] placeholder:text-[#6f88b2]"
         />
         <button
           type="button"
           onClick={clearFilters}
-          className="rounded-xl border border-slate-700/80 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500"
+          className="rounded-xl border border-[#2b4068] bg-[#0c1730cc] px-3 py-2 text-sm font-semibold text-[#d8e6ff] transition hover:border-[#4d709e]"
         >
           Clear
         </button>
       </div>
 
       {!isLoading && error && <p className="text-sm text-rose-300">{error}</p>}
-      {!isLoading && !error && !hasEntries && <p className="text-sm text-slate-400">No traders match the current filters.</p>}
+      {!isLoading && !error && !hasEntries && <p className="text-sm text-[#8fa5cb]">No traders match the current filters.</p>}
 
       {!isLoading && !error && hasEntries && (
         <>
@@ -279,9 +279,9 @@ export function Leaderboard({
             <div className="reveal reveal-2">{third && <PodiumCard entry={third} onSelect={onSelect} compact />}</div>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-800/60 bg-slate-900/50 reveal reveal-1">
+          <div className="overflow-x-auto rounded-2xl border border-[#26395f] bg-[#101c35b3] reveal reveal-1">
             <table className="min-w-full text-sm">
-              <thead className="border-b border-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-400">
+              <thead className="border-b border-[#26395f] text-left text-xs uppercase tracking-wide text-[#8fa5cb]">
                 <tr>
                   <th className="px-4 py-3">Rank</th>
                   <th className="px-4 py-3">Trader</th>
@@ -299,11 +299,11 @@ export function Leaderboard({
                     <tr
                       key={trader.address}
                       onClick={() => onSelect(trader.address)}
-                      className={`cursor-pointer border-b border-slate-800/40 transition last:border-b-0 ${
-                        isSelected ? 'bg-blue-500/10' : 'hover:bg-slate-800/50'
+                      className={`cursor-pointer border-b border-[#26395f] transition last:border-b-0 ${
+                        isSelected ? 'bg-[#14325a]' : 'hover:bg-[#15233f]'
                       }`}
                     >
-                      <td className="px-4 py-3 font-semibold text-slate-200">#{trader.rank}</td>
+                      <td className="px-4 py-3 font-semibold text-[#d8e6ff]">#{trader.rank}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <img
@@ -313,7 +313,7 @@ export function Leaderboard({
                           />
                           <div>
                             <p className="font-medium text-slate-100">{trader.displayName}</p>
-                            <p className="text-xs text-slate-500">{trader.address}</p>
+                            <p className="text-xs text-[#8fa5cb]">{trader.address}</p>
                           </div>
                         </div>
                       </td>
@@ -325,8 +325,8 @@ export function Leaderboard({
                         {formatPercent(trader.roi)}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-slate-100">{formatUsd(trader.pnl)}</td>
-                      <td className="px-4 py-3 text-right text-slate-200">{formatUsd(trader.volume)}</td>
-                      <td className="px-4 py-3 text-right text-slate-200">{formatNumber(trader.trades)}</td>
+                      <td className="px-4 py-3 text-right text-[#d8e6ff]">{formatUsd(trader.volume)}</td>
+                      <td className="px-4 py-3 text-right text-[#d8e6ff]">{formatNumber(trader.trades)}</td>
                     </tr>
                   );
                 })}
