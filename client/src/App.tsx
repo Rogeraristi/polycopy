@@ -4,6 +4,7 @@ import { Leaderboard, type LeaderboardEntry } from './components/Leaderboard';
 import BreakingNewsBanner from './components/BreakingNewsBanner';
 import { TraderDashboard } from './components/TraderDashboard';
 import { TraderSearch } from './components/TraderSearch';
+import MetallicLogo from './components/MetallicLogo';
 import Beams from './components/effects/Beams';
 import GlassPanel from './components/effects/GlassPanel';
 import { useSession } from './hooks/useSession';
