@@ -1,7 +1,7 @@
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = (import.meta as any).env ? (import.meta as any).env.VITE_API_BASE_URL || '/api' : '/api';
 
 
 export default function BreakingNewsBanner() {
@@ -40,9 +40,15 @@ export default function BreakingNewsBanner() {
     let start = 0;
     const speed = 1;
     function animate() {
+      if (!ticker) return;
       start -= speed;
       if (ticker.scrollWidth + start < 0) {
-        start = ticker.parentElement!.offsetWidth;
+        const parent = ticker.parentElement;
+        if (parent) {
+          start = parent.offsetWidth;
+        } else {
+          start = 0;
+        }
       }
       ticker.style.transform = `translateX(${start}px)`;
       animationId = requestAnimationFrame(animate);

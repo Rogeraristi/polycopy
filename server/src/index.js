@@ -53,6 +53,12 @@ const POLYMARKET_DATA_API_USER_AGENT =
   process.env.POLYMARKET_DATA_API_UA ||
   POLYMARKET_SEARCH_API_USER_AGENT ||
   'polycopy/1.0 (+https://polymarket.com)';
+const FEATURE_REAL_COPY_EXECUTION = ['1', 'true', 'yes', 'on'].includes(
+  String(process.env.FEATURE_REAL_COPY_EXECUTION || '').toLowerCase()
+);
+const COPY_EXECUTION_MODE = (process.env.COPY_EXECUTION_MODE || 'webhook').toLowerCase();
+const COPY_EXECUTOR_WEBHOOK_URL = process.env.COPY_EXECUTOR_WEBHOOK_URL || '';
+const COPY_EXECUTOR_WEBHOOK_AUTH_TOKEN = process.env.COPY_EXECUTOR_WEBHOOK_AUTH_TOKEN || '';
 
 const FALLBACK_CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || process.env.CLIENT_URL || 'http://localhost:5173';
 const ADDITIONAL_CLIENT_ORIGINS =
@@ -1294,6 +1300,86 @@ app.post('/api/copy-trade', async (req, res) => {
     message: 'Generated suggested order. Submit this payload using the Polymarket trading API with your wallet signature.',
     order: suggestedOrder
   });
+});
+
+app.post('/api/copy-trade/execute', async (req, res) => {
+  if (!FEATURE_REAL_COPY_EXECUTION) {
+    res.status(503).json({
+      error:
+        'Real copy execution is disabled. Set FEATURE_REAL_COPY_EXECUTION=true to enable this endpoint.'
+    });
+    return;
+  }
+
+  const { order, targetWallet, sourceTrade } = req.body || {};
+  if (!order || typeof order !== 'object' || !targetWallet || typeof targetWallet !== 'string') {
+    res.status(400).json({ error: 'order object and targetWallet are required' });
+    return;
+  }
+
+  if (COPY_EXECUTION_MODE !== 'webhook') {
+    res.status(501).json({
+      error: `COPY_EXECUTION_MODE=${COPY_EXECUTION_MODE} is not implemented. Use COPY_EXECUTION_MODE=webhook.`
+    });
+    return;
+  }
+
+  if (!COPY_EXECUTOR_WEBHOOK_URL) {
+    res.status(500).json({
+      error:
+        'COPY_EXECUTOR_WEBHOOK_URL is not configured. Provide a signer/executor service URL before enabling real execution.'
+    });
+    return;
+  }
+
+  try {
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    };
+    if (COPY_EXECUTOR_WEBHOOK_AUTH_TOKEN) {
+      headers.Authorization = `Bearer ${COPY_EXECUTOR_WEBHOOK_AUTH_TOKEN}`;
+    }
+
+    const response = await fetch(COPY_EXECUTOR_WEBHOOK_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        order,
+        targetWallet: targetWallet.toLowerCase(),
+        sourceTrade: sourceTrade ?? null,
+        requestedAt: new Date().toISOString(),
+        source: 'polycopy'
+      })
+    });
+
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch {
+      payload = { raw: text };
+    }
+
+    if (!response.ok) {
+      res.status(502).json({
+        error: 'Executor rejected copy order',
+        status: response.status,
+        details: payload
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      mode: COPY_EXECUTION_MODE,
+      executor: 'webhook',
+      result: payload
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(502).json({ error: 'Failed to execute copy order', details: message });
+  }
 });
 
 app.get('/api/leaderboard', async (req, res) => {

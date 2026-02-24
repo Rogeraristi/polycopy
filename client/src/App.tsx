@@ -29,6 +29,7 @@ interface CopyTradeResult {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const REAL_COPY_EXECUTION_ENABLED = String(import.meta.env.VITE_FEATURE_REAL_COPY_EXECUTION || '').toLowerCase() === 'true';
 
 function DashboardPage() {
   const [inputAddress, setInputAddress] = useState('');
@@ -42,6 +43,9 @@ function DashboardPage() {
   const [copyError, setCopyError] = useState<string | null>(null);
   const [copyResult, setCopyResult] = useState<CopyTradeResult | null>(null);
   const [isCopying, setIsCopying] = useState(false);
+  const [isExecutingCopy, setIsExecutingCopy] = useState(false);
+  const [executeCopyError, setExecuteCopyError] = useState<string | null>(null);
+  const [executeCopyResult, setExecuteCopyResult] = useState<string | null>(null);
 
   const {
     user,
@@ -155,6 +159,8 @@ function DashboardPage() {
     setSelectedAddress(sanitized || null);
     setCopyResult(null);
     setCopyError(null);
+    setExecuteCopyError(null);
+    setExecuteCopyResult(null);
   }, []);
 
   const handleCopyTrade = useCallback(
@@ -196,6 +202,8 @@ function DashboardPage() {
           message: payload.message,
           sourceTrade: trade
         });
+        setExecuteCopyError(null);
+        setExecuteCopyResult(null);
       } catch (err) {
         setCopyResult(null);
         setCopyError(err instanceof Error ? err.message : 'Failed to prepare copy trade payload.');
@@ -210,7 +218,57 @@ function DashboardPage() {
     disconnectWallet();
     setCopyResult(null);
     setCopyError(null);
+    setExecuteCopyError(null);
+    setExecuteCopyResult(null);
   }, [disconnectWallet]);
+
+  const handleExecuteCopyTrade = useCallback(async () => {
+    if (!copyResult) {
+      setExecuteCopyError('No prepared order found.');
+      return;
+    }
+    if (!connectedWallet) {
+      setExecuteCopyError('Connect your wallet before executing.');
+      return;
+    }
+
+    setIsExecutingCopy(true);
+    setExecuteCopyError(null);
+    setExecuteCopyResult(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/copy-trade/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          order: copyResult.order,
+          targetWallet: connectedWallet,
+          sourceTrade: copyResult.sourceTrade
+        })
+      });
+
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) {
+        const message =
+          (payload && (payload.error || payload.details?.error || payload.details?.message)) ||
+          `Execution failed (${response.status})`;
+        throw new Error(typeof message === 'string' ? message : 'Execution failed');
+      }
+
+      const summary =
+        payload?.result?.status ||
+        payload?.result?.id ||
+        payload?.result?.orderId ||
+        payload?.result?.txHash ||
+        'Copy order sent to executor successfully.';
+      setExecuteCopyResult(String(summary));
+    } catch (err) {
+      setExecuteCopyError(err instanceof Error ? err.message : 'Execution failed');
+    } finally {
+      setIsExecutingCopy(false);
+    }
+  }, [copyResult, connectedWallet]);
 
   const periodOptions = useMemo(() => {
     return Object.keys(leaderboardPeriods).map((key) => ({
@@ -355,6 +413,25 @@ function DashboardPage() {
                 <dd className="font-semibold">{copyResult.order.size ?? 'n/a'}</dd>
               </div>
             </dl>
+
+            {REAL_COPY_EXECUTION_ENABLED ? (
+              <div className="mt-4 space-y-2">
+                <button
+                  type="button"
+                  onClick={handleExecuteCopyTrade}
+                  disabled={isExecutingCopy || !isWalletConnected}
+                  className="rounded-lg bg-primary px-4 py-2 font-semibold text-white transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isExecutingCopy ? 'Executing…' : 'Execute Copy Order'}
+                </button>
+                {executeCopyError && <p className="text-sm text-rose-200">{executeCopyError}</p>}
+                {executeCopyResult && <p className="text-sm text-emerald-100">{executeCopyResult}</p>}
+              </div>
+            ) : (
+              <p className="mt-4 text-xs text-emerald-200/80">
+                Real execution is disabled locally. Set <code>VITE_FEATURE_REAL_COPY_EXECUTION=true</code> to enable the execute button.
+              </p>
+            )}
           </section>
         )}
 
