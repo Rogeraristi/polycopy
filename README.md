@@ -32,6 +32,8 @@ npm run dev --workspace client
 
 - `PORT` – Optional. Backend port (defaults to `4000`).
 - `POLYMARKET_BASE` – Optional. Polymarket API base URL (defaults to `https://gamma-api.polymarket.com`).
+- `POLYMARKET_DATA_API_BASE` – Optional. Polymarket data API base URL (defaults to `https://data-api.polymarket.com`).
+- `LEADERBOARD_LIMIT` – Optional. Max traders per period served by `/api/leaderboard` (defaults to `12`).
 
 ### Client origins & sessions
 
@@ -93,6 +95,47 @@ The scheduled function runs on the cron defined by `LEADERBOARD_REFRESH_SCHEDULE
 > Once deployed, the Express API reads the latest snapshot from `FIREBASE_LEADERBOARD_COLLECTION`, falling back to a live scrape if the cached document is stale or missing.
 
 > ⚠️ The development setup uses the in-memory session store from Express. Switch to a persistent store (e.g. Redis) before deploying to production.
+
+## Live Leaderboard + Trader Profile Setup
+
+To ensure live period-aware data for:
+
+- `/leaderboard` filters (`Today`, `This Week`, `This Month`, `All Time`)
+- trader profile period filters
+- `/api/leaderboard/debug` diagnostics
+
+set these backend env vars in production:
+
+- `POLYMARKET_BASE=https://gamma-api.polymarket.com`
+- `POLYMARKET_DATA_API_BASE=https://data-api.polymarket.com`
+- `LEADERBOARD_LIMIT=12` (or higher if needed)
+
+Optional but recommended for richer trader search/profile identity:
+
+- `POLYMARKET_SEARCH_API_URL`
+- one of:
+  - `POLYMARKET_SEARCH_API_BEARER`
+  - `POLYMARKET_SEARCH_API_KEY`
+  - `POLYMARKET_SEARCH_CF_ACCESS_ID` + `POLYMARKET_SEARCH_CF_ACCESS_SECRET`
+
+## Verify Live Data (Local or Prod)
+
+From repo root:
+
+```bash
+./scripts/verify-live-data.sh http://localhost:4000 0x6bab41a0dc40d6dd4c1a915b8c01969479fd1292
+```
+
+For production:
+
+```bash
+./scripts/verify-live-data.sh https://YOUR_BACKEND_DOMAIN 0x6bab41a0dc40d6dd4c1a915b8c01969479fd1292
+```
+
+The script checks:
+
+- `/api/leaderboard/debug?refresh=1`
+- `/api/users/:address/overview?period=today|weekly|monthly|all&limit=250`
 
 ## Notes
 
