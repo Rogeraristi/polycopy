@@ -472,9 +472,17 @@ app.post('/api/user/settings', ensureAuthenticated, ensureFirebaseReady, async (
 
 function normaliseTradesPayload(payload) {
   if (!payload) return [];
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload.data)) return payload.data;
-  return [];
+  const trades = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload.data)
+    ? payload.data
+    : [];
+  // Add normalization for username and avatar
+  return trades.map((trade) => ({
+    ...trade,
+    username: trade.username || trade.userName || trade.displayName || trade.account || trade.address || '',
+    avatarUrl: trade.avatarUrl || trade.avatar || null
+  }));
 }
 
 async function fetchJson(url) {
@@ -491,9 +499,10 @@ async function fetchJson(url) {
 }
 
 async function fetchUserTrades(address) {
+  // Remove limit to fetch all trades (if API supports it)
   const params = new URLSearchParams({
-    account: address,
-    limit: '25'
+    account: address
+    // No limit param, fetch all if possible
   });
   const url = `${POLYMARKET_BASE}/trades?${params.toString()}`;
   try {

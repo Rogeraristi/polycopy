@@ -64,6 +64,19 @@ export function Leaderboard({
   const activePeriodLabel = periodOptions.find((option) => option.key === selectedPeriod)?.label ?? null;
   const hasPeriodControls = periodOptions.length > 0;
 
+  // Fallback avatar
+  // Load fallback avatars
+  const fallbackAvatars = [
+    require('../assets/profile1.png'),
+    require('../assets/profile2.png'),
+    require('../assets/profile3.png'),
+    require('../assets/profile4.png'),
+    require('../assets/profile5.png'),
+    require('../assets/profile6.png'),
+    require('../assets/profile7.png'),
+    require('../assets/profile8.png'),
+    require('../assets/profile9.png'),
+  ];
   return (
     <section className="card p-6 space-y-4">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -116,6 +129,12 @@ export function Leaderboard({
         <ul className="grid gap-3 md:grid-cols-2">
           {entries.map((entry) => {
             const isSelected = selectedAddress === entry.address;
+            // Cycle fallback avatars by address hash
+            let avatar = entry.avatarUrl;
+            if (!avatar) {
+              const hash = Array.from(entry.address).reduce((acc, c) => acc + c.charCodeAt(0), 0);
+              avatar = fallbackAvatars[hash % fallbackAvatars.length];
+            }
             return (
               <li key={`${entry.rank}-${entry.address}`}>
                 <button
@@ -138,16 +157,14 @@ export function Leaderboard({
                       >
                         #{entry.rank}
                       </span>
-                      {entry.avatarUrl && (
-                        <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-800 bg-slate-900">
-                          <img
-                            src={entry.avatarUrl}
-                            alt={`${entry.displayName} avatar`}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        </span>
-                      )}
+                      <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-800 bg-slate-900">
+                        <img
+                          src={avatar}
+                          alt={`${entry.displayName} avatar`}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      </span>
                       <span>{entry.displayName}</span>
                     </div>
                     <span

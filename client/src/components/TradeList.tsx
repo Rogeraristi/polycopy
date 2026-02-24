@@ -29,6 +29,43 @@ function getKey(trade: Trade) {
 }
 
 export function TradeList({ trades, onCopy, isCopying, canCopy = true }: TradeListProps) {
+  // Sorting/filtering state
+  const [sortKey, setSortKey] = React.useState<'date' | 'size' | 'price'>('date');
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
+  const [filterText, setFilterText] = React.useState('');
+  const fallbackAvatars = [
+    require('../assets/profile1.png'),
+    require('../assets/profile2.png'),
+    require('../assets/profile3.png'),
+    require('../assets/profile4.png'),
+    require('../assets/profile5.png'),
+    require('../assets/profile6.png'),
+    require('../assets/profile7.png'),
+    require('../assets/profile8.png'),
+    require('../assets/profile9.png'),
+  ];
+
+  const sortedTrades = [...trades].filter(trade => {
+    if (!filterText) return true;
+    return (
+      (trade.market?.question || trade.market?.title || '').toLowerCase().includes(filterText.toLowerCase()) ||
+      (trade.username || '').toLowerCase().includes(filterText.toLowerCase())
+    );
+  }).sort((a, b) => {
+    let aVal, bVal;
+    if (sortKey === 'date') {
+      aVal = new Date(a.created_at || a.createdAt || a.timestamp || 0).getTime();
+      bVal = new Date(b.created_at || b.createdAt || b.timestamp || 0).getTime();
+    } else if (sortKey === 'size') {
+      aVal = Number(a.amount || a.size || a.shares || 0);
+      bVal = Number(b.amount || b.size || b.shares || 0);
+    } else {
+      aVal = Number(a.price ?? 0);
+      bVal = Number(b.price ?? 0);
+    }
+    return sortDir === 'asc' ? aVal - bVal : bVal - aVal;
+  });
+
   if (trades.length === 0) {
     return (
       <div className="card p-8 text-center">
@@ -39,7 +76,32 @@ export function TradeList({ trades, onCopy, isCopying, canCopy = true }: TradeLi
 
   return (
     <div className="space-y-4">
-      {trades.map((trade) => {
+      <div className="flex flex-wrap gap-4 items-center mb-2">
+        <input
+          type="text"
+          placeholder="Filter by market or username..."
+          value={filterText}
+          onChange={e => setFilterText(e.target.value)}
+          className="rounded border border-slate-700 bg-slate-900 px-3 py-1 text-sm text-slate-200"
+        />
+        <label className="text-xs text-slate-400">Sort by:</label>
+        <select
+          value={sortKey}
+          onChange={e => setSortKey(e.target.value as any)}
+          className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200"
+        >
+          <option value="date">Date</option>
+          <option value="size">Size</option>
+          <option value="price">Price</option>
+        </select>
+        <button
+          className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-200"
+          onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))}
+        >
+          {sortDir === 'asc' ? '↑' : '↓'}
+        </button>
+      </div>
+      {sortedTrades.map((trade) => {
         const createdAt = trade.created_at || trade.createdAt || trade.timestamp;
         const when = createdAt
           ? formatDistanceToNow(new Date(createdAt), {
@@ -50,13 +112,27 @@ export function TradeList({ trades, onCopy, isCopying, canCopy = true }: TradeLi
         const side = (trade.side || trade.type || '').toUpperCase();
         const price = Number(trade.price ?? 0);
         const size = Number(trade.amount || trade.size || trade.shares || 0);
+        // Cycle fallback avatars by address hash
+        let avatar = trade.avatarUrl;
+        const address = trade.account || trade.user || trade.wallet || '';
+        if (!avatar) {
+          const hash = Array.from(address).reduce((acc, c) => acc + c.charCodeAt(0), 0);
+          avatar = fallbackAvatars[hash % fallbackAvatars.length];
+        }
+        const username = trade.username || address || 'unknown';
 
         return (
           <article key={getKey(trade) || `${trade.created_at}-${trade.price}`} className="card p-5 flex flex-col gap-2">
             <header className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase text-slate-400 tracking-wide">{when}</p>
-                <h3 className="text-lg font-semibold text-slate-100">{marketQuestion}</h3>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-800 bg-slate-900">
+                  <img src={avatar} alt="Trader avatar" className="h-full w-full object-cover" loading="lazy" />
+                </span>
+                <div>
+                  <p className="text-xs uppercase text-slate-400 tracking-wide">{when}</p>
+                  <h3 className="text-lg font-semibold text-slate-100">{marketQuestion}</h3>
+                  <p className="text-xs text-slate-400">{username}</p>
+                </div>
               </div>
               <span className={`px-3 py-1 text-xs font-semibold rounded-full ${side === 'BUY' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
                 {side || 'TRADE'}
@@ -74,10 +150,6 @@ export function TradeList({ trades, onCopy, isCopying, canCopy = true }: TradeLi
               <div>
                 <p className="text-xs uppercase text-slate-500">Size</p>
                 <p className="font-medium">{size.toFixed(2)} shares</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase text-slate-500">Trader</p>
-                <p className="font-mono text-xs break-all text-slate-400">{trade.account || trade.user || trade.wallet || 'unknown'}</p>
               </div>
             </div>
             <button
