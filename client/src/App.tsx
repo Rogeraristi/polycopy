@@ -237,14 +237,14 @@ function TopNav({
   }, [walletProviderAvailable, isWalletConnected, disconnectWallet, connectWallet]);
 
   return (
-    <GlassPanel advanced={advancedGlass} className="px-6 py-4">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-8">
+    <GlassPanel advanced={advancedGlass} className="px-3 py-3 sm:px-6 sm:py-4">
+      <header className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center justify-between gap-3 sm:gap-8">
           <Link to="/" className="flex items-center gap-3">
-            <MetallicLogo size={42} animated />
+            <MetallicLogo size={36} animated />
             <div>
               <p className="text-sm font-semibold tracking-wide text-white">PolyCopy</p>
-              <p className="text-xs text-slate-400">Built for Polymarket</p>
+              <p className="hidden text-xs text-slate-400 sm:block">Built for Polymarket</p>
             </div>
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm text-slate-300">
@@ -262,12 +262,12 @@ function TopNav({
             </Link>
           </nav>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
           <button
             type="button"
             onClick={handleSessionClick}
             disabled={(Boolean(user) && (isSessionLoading || isSessionActionPending)) || isSessionActionPending}
-            className="rounded-full border border-slate-700/80 bg-slate-900/80 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:opacity-60"
+            className="w-full rounded-full border border-slate-700/80 bg-slate-900/80 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-slate-500 disabled:opacity-60 sm:w-auto"
           >
             {isSessionLoading ? (
               'Loading...'
@@ -288,11 +288,11 @@ function TopNav({
             type="button"
             onClick={handleWalletClick}
             disabled={isWalletConnecting || !walletProviderAvailable}
-            className="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60"
+            className="w-full rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-500 disabled:opacity-60 sm:w-auto"
           >
             {isWalletConnecting ? 'Connecting...' : isWalletConnected ? shortAddress(connectedWallet) : 'Connect Wallet'}
           </button>
-          {isWalletConnected && walletChainId && <span className="text-xs text-slate-400">Chain {walletChainId}</span>}
+          {isWalletConnected && walletChainId && <span className="text-center text-xs text-slate-400 sm:text-left">Chain {walletChainId}</span>}
         </div>
       </header>
     </GlassPanel>
@@ -411,7 +411,7 @@ function HomePage() {
         <Beams beamWidth={2.1} beamHeight={25} beamNumber={50} noiseIntensity={0.15} scale={0.27} rotation={39} speed={1.4} />
       </div>
       {/* Removed or reduced radial gradient overlay to minimize fill behind navbar */}
-      <div className="relative z-10 mx-auto max-w-7xl px-3 pb-20 pt-8 space-y-14 sm:px-6">
+      <div className="relative z-10 mx-auto max-w-7xl px-3 pb-16 pt-4 space-y-10 sm:px-6 sm:pb-20 sm:pt-8 sm:space-y-14">
         <div className="sticky top-0 z-30 flex flex-col gap-2 backdrop-blur-md transition-all duration-300 shadow-md">
           <TopNav
             currentPath="/"
@@ -434,20 +434,20 @@ function HomePage() {
           </div>
         </div>
 
-        <section className="text-center space-y-5 reveal">
+        <section className="text-center space-y-4 sm:space-y-5 reveal">
           <p className="inline-flex rounded-full border border-blue-400/30 bg-blue-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-blue-200">
             Polymarket Intelligence
           </p>
-          <div className="flex items-center justify-center gap-6">
-            <MetallicLogo size={230} animated />
-            <h1 className="max-w-4xl text-2xl font-semibold leading-tight text-white sm:text-4xl">
+          <div className="flex flex-col items-center justify-center gap-4 sm:gap-6 md:flex-row">
+            <MetallicLogo size={140} animated />
+            <h1 className="max-w-4xl text-xl font-semibold leading-tight text-white sm:text-3xl md:text-4xl">
               Discover top traders and track your own portfolio with confidence
             </h1>
           </div>
-          <p className="mx-auto max-w-2xl text-base text-slate-300 sm:text-lg">
+          <p className="mx-auto max-w-2xl px-2 text-sm text-slate-300 sm:px-0 sm:text-lg">
             Track your own portfolio and analyze other traders before deciding who to follow.
           </p>
-          <div className="flex justify-center gap-3">
+          <div className="grid w-full max-w-sm grid-cols-1 gap-2 sm:flex sm:max-w-none sm:justify-center sm:gap-3">
             <Link to="/leaderboard" className="rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-500">
               View Top Traders
             </Link>
@@ -468,8 +468,8 @@ function HomePage() {
           </GlassPanel>
         )}
 
-        <section className="grid gap-5 lg:grid-cols-3">
-          <GlassPanel className="rounded-3xl p-6 reveal reveal-1">
+        <section className="grid gap-4 lg:grid-cols-3 lg:gap-5">
+          <GlassPanel className="rounded-3xl p-5 sm:p-6 reveal reveal-1">
             <article>
             <p className="text-xs uppercase tracking-wide text-blue-200">Leaderboard</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">Follow the most successful traders</h2>
@@ -480,7 +480,7 @@ function HomePage() {
             </article>
           </GlassPanel>
 
-          <GlassPanel className="rounded-3xl p-6 reveal reveal-2">
+          <GlassPanel className="rounded-3xl p-5 sm:p-6 reveal reveal-2">
             <article id="search">
             <p className="text-xs uppercase tracking-wide text-blue-200">Search Traders</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">Analyze any wallet</h2>
@@ -501,7 +501,7 @@ function HomePage() {
             </article>
           </GlassPanel>
 
-          <GlassPanel className="rounded-3xl p-6 reveal reveal-3">
+          <GlassPanel className="rounded-3xl p-5 sm:p-6 reveal reveal-3">
             <article>
             <p className="text-xs uppercase tracking-wide text-blue-200">Portfolio View</p>
             <h2 className="mt-3 text-2xl font-semibold text-white">Track your own edge</h2>
@@ -561,7 +561,7 @@ function LeaderboardPage() {
   return (
     <div className="min-h-screen bg-[#040712] text-slate-100">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
-      <div className="relative z-10 mx-auto max-w-7xl px-3 pb-20 pt-8 space-y-10 sm:px-6">
+      <div className="relative z-10 mx-auto max-w-7xl px-3 pb-16 pt-4 space-y-8 sm:px-6 sm:pb-20 sm:pt-8 sm:space-y-10">
         <div className="sticky top-0 z-30 flex flex-col gap-2 transition-all duration-300 shadow-md">
           <TopNav
             currentPath="/leaderboard"

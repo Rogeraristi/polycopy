@@ -323,10 +323,10 @@ export function Leaderboard({
 
       {hasEntries && !error && (
         <>
-          <div className="grid gap-4 md:grid-cols-3 md:items-end">
-            <div className="reveal reveal-1">{second && <PodiumCard entry={second} onSelect={onSelect} onPrefetch={onPrefetch} compact />}</div>
-            <div className="reveal">{first && <PodiumCard entry={first} onSelect={onSelect} onPrefetch={onPrefetch} emphasized />}</div>
-            <div className="reveal reveal-2">{third && <PodiumCard entry={third} onSelect={onSelect} onPrefetch={onPrefetch} compact />}</div>
+          <div className="grid gap-3 sm:gap-4 md:grid-cols-3 md:items-end">
+            <div className="order-2 md:order-1 reveal reveal-1">{second && <PodiumCard entry={second} onSelect={onSelect} onPrefetch={onPrefetch} compact />}</div>
+            <div className="order-1 md:order-2 reveal">{first && <PodiumCard entry={first} onSelect={onSelect} onPrefetch={onPrefetch} emphasized />}</div>
+            <div className="order-3 md:order-3 reveal reveal-2">{third && <PodiumCard entry={third} onSelect={onSelect} onPrefetch={onPrefetch} compact />}</div>
           </div>
 
           <div className="space-y-3 md:hidden">
