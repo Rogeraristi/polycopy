@@ -412,7 +412,7 @@ function HomePage() {
       </div>
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
       <div className="relative z-10 mx-auto max-w-7xl px-6 pb-20 pt-8 space-y-14">
-        <div className="sticky top-0 z-30 flex flex-col gap-2 bg-[#040712]/80 backdrop-blur-md transition-all duration-300 shadow-md">
+        <div className="sticky top-0 z-30 flex flex-col gap-2 backdrop-blur-md transition-all duration-300 shadow-md">
           <TopNav
             currentPath="/"
             advancedGlass
@@ -429,7 +429,7 @@ function HomePage() {
             connectWallet={connectWallet}
             disconnectWallet={disconnectWallet}
           />
-          <div className="rounded-2xl">
+          <div className="overflow-hidden rounded-[22px] border border-white/15 bg-transparent backdrop-blur-md">
             <BreakingNewsBanner />
           </div>
         </div>
@@ -565,6 +565,7 @@ function LeaderboardPage() {
         <div className="sticky top-0 z-30 flex flex-col gap-2 transition-all duration-300 shadow-md">
           <TopNav
             currentPath="/leaderboard"
+            advancedGlass
             user={user}
             isSessionLoading={isSessionLoading}
             isSessionActionPending={isSessionActionPending}
@@ -578,9 +579,9 @@ function LeaderboardPage() {
             connectWallet={connectWallet}
             disconnectWallet={disconnectWallet}
           />
-          <GlassPanel className="overflow-hidden rounded-2xl">
+          <div className="overflow-hidden rounded-[22px] border border-white/15 bg-transparent backdrop-blur-md">
             <BreakingNewsBanner />
-          </GlassPanel>
+          </div>
         </div>
 
         {(sessionError || walletError) && (
