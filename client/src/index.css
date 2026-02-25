@@ -43,3 +43,37 @@ body {
 .reveal-3 {
   animation-delay: 200ms;
 }
+
+@keyframes metallicSweep {
+  0% {
+    background-position: 0% 50%;
+    opacity: 0.25;
+  }
+  50% {
+    background-position: 100% 50%;
+    opacity: 0.85;
+  }
+  100% {
+    background-position: 0% 50%;
+    opacity: 0.25;
+  }
+}
+
+.metallic-logo-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.75) 26%,
+    rgba(185, 200, 220, 0.9) 43%,
+    rgba(255, 255, 255, 0.9) 55%,
+    rgba(155, 170, 190, 0.62) 72%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  background-size: 230% 230%;
+  mix-blend-mode: screen;
+  animation: metallicSweep 2.7s ease-in-out infinite;
+}

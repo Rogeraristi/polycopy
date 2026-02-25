@@ -439,7 +439,7 @@ function HomePage() {
             Polymarket Intelligence
           </p>
           <div className="flex flex-col items-center justify-center gap-4 sm:gap-6 md:flex-row">
-            <MetallicLogo size={140} animated />
+            <MetallicLogo size={420} animated />
             <h1 className="max-w-4xl text-xl font-semibold leading-tight text-white sm:text-3xl md:text-4xl">
               Discover top traders and track your own portfolio with confidence
             </h1>
