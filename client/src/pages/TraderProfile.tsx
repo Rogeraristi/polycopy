@@ -102,10 +102,13 @@ export default function TraderProfile() {
     const controller = new AbortController();
     const normalizedAddress = address.toLowerCase();
     const applyOverviewPayload = (overview: any) => {
+      const overviewProfile = overview?.profile && typeof overview.profile === 'object' ? overview.profile : null;
       const nextTrades = Array.isArray(overview?.trades) ? overview.trades : [];
       const nextPnl =
         typeof overview?.pnl?.pnl === 'number'
           ? overview.pnl.pnl
+          : typeof overviewProfile?.pnl === 'number'
+          ? overviewProfile.pnl
           : typeof leaderboardContext?.pnl === 'number'
           ? leaderboardContext.pnl
           : null;
@@ -119,6 +122,8 @@ export default function TraderProfile() {
         tradeCount:
           typeof overview?.pnl?.tradeCount === 'number'
             ? overview.pnl.tradeCount
+            : typeof overviewProfile?.trades === 'number'
+            ? overviewProfile.trades
             : typeof leaderboardContext?.trades === 'number'
             ? leaderboardContext.trades
             : undefined
@@ -128,7 +133,51 @@ export default function TraderProfile() {
         openOrders: Array.isArray(overview?.openOrders?.openOrders) ? overview.openOrders.openOrders : [],
         note: typeof overview?.openOrders?.note === 'string' ? overview.openOrders.note : undefined
       });
-      setProfileSummary(overview?.profile || null);
+      setProfileSummary(overviewProfile || null);
+      if (overviewProfile) {
+        setLeaderboardContext((previous) => ({
+          displayName:
+            (typeof overviewProfile.displayName === 'string' && overviewProfile.displayName.trim()) ||
+            previous?.displayName ||
+            navigationEntry?.displayName ||
+            null,
+          rank:
+            typeof overviewProfile.rank === 'number'
+              ? overviewProfile.rank
+              : typeof previous?.rank === 'number'
+              ? previous.rank
+              : navigationEntry?.rank ?? null,
+          roi:
+            typeof overviewProfile.roi === 'number'
+              ? overviewProfile.roi
+              : typeof previous?.roi === 'number'
+              ? previous.roi
+              : navigationEntry?.roi ?? null,
+          pnl:
+            typeof overviewProfile.pnl === 'number'
+              ? overviewProfile.pnl
+              : typeof previous?.pnl === 'number'
+              ? previous.pnl
+              : navigationEntry?.pnl ?? null,
+          volume:
+            typeof overviewProfile.volume === 'number'
+              ? overviewProfile.volume
+              : typeof previous?.volume === 'number'
+              ? previous.volume
+              : navigationEntry?.volume ?? null,
+          trades:
+            typeof overviewProfile.trades === 'number'
+              ? overviewProfile.trades
+              : typeof previous?.trades === 'number'
+              ? previous.trades
+              : navigationEntry?.trades ?? null,
+          avatarUrl:
+            (typeof overviewProfile.avatarUrl === 'string' && overviewProfile.avatarUrl) ||
+            previous?.avatarUrl ||
+            navigationEntry?.avatarUrl ||
+            null
+        }));
+      }
     };
 
     let hydratedFromCache = false;
@@ -241,7 +290,7 @@ export default function TraderProfile() {
       cancelled = true;
       controller.abort();
     };
-  }, [address, period, refreshTick, leaderboardContext?.pnl, leaderboardContext?.trades]);
+  }, [address, period, refreshTick, navigationEntry]);
 
   const tradeRows = useMemo(() => {
     return trades.map((trade, i) => ({

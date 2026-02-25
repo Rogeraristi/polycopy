@@ -2156,6 +2156,26 @@ function resolveTraderByAddress(address, traders) {
   );
 }
 
+function getLeaderboardEntryByAddress(address) {
+  const normalizedAddress = String(address || '').toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalizedAddress)) {
+    return null;
+  }
+  const snapshot = leaderboardCache.snapshot;
+  if (!snapshot || !snapshot.periods || typeof snapshot.periods !== 'object') {
+    return null;
+  }
+
+  const periods = Object.values(snapshot.periods).filter(Array.isArray);
+  for (const bucket of periods) {
+    const match = bucket.find(
+      (entry) => entry && typeof entry.address === 'string' && entry.address.toLowerCase() === normalizedAddress
+    );
+    if (match) return match;
+  }
+  return null;
+}
+
 function buildPolymarketProfileUrl(match) {
   if (!match || typeof match !== 'object') return null;
   const username = normaliseHandle(match.username);
@@ -2177,24 +2197,46 @@ async function fetchTraderProfileSummary(address) {
 
   try {
     const { traders } = await searchTraders(normalized, 12);
-    const match = resolveTraderByAddress(normalized, traders);
+    const searchMatch = resolveTraderByAddress(normalized, traders);
+    const leaderboardMatch = getLeaderboardEntryByAddress(normalized);
+    const match = searchMatch || leaderboardMatch;
     if (!match) return null;
+
+    const displayName =
+      (typeof searchMatch?.displayName === 'string' && searchMatch.displayName.trim()) ||
+      (typeof leaderboardMatch?.displayName === 'string' && leaderboardMatch.displayName.trim()) ||
+      `${normalized.slice(0, 6)}...${normalized.slice(-4)}`;
+
+    const username =
+      (typeof searchMatch?.username === 'string' && searchMatch.username.trim()) ||
+      (typeof leaderboardMatch?.username === 'string' && leaderboardMatch.username.trim()) ||
+      null;
+
+    const pseudonym =
+      (typeof searchMatch?.pseudonym === 'string' && searchMatch.pseudonym.trim()) ||
+      (typeof leaderboardMatch?.pseudonym === 'string' && leaderboardMatch.pseudonym.trim()) ||
+      null;
+
+    const polymarketUrl = buildPolymarketProfileUrl({ username, pseudonym });
 
     return {
       address: normalized,
-      displayName:
-        typeof match.displayName === 'string' && match.displayName.trim()
-          ? match.displayName
-          : `${normalized.slice(0, 6)}…${normalized.slice(-4)}`,
-      username: typeof match.username === 'string' ? match.username : null,
-      pseudonym: typeof match.pseudonym === 'string' ? match.pseudonym : null,
-      polymarketUrl: buildPolymarketProfileUrl(match),
-      avatarUrl: typeof match.avatarUrl === 'string' ? match.avatarUrl : null,
-      rank: Number.isFinite(Number(match.rank)) ? Number(match.rank) : null,
-      roi: toFiniteNumber(match.roi),
-      pnl: toFiniteNumber(match.pnl),
-      volume: toFiniteNumber(match.volume),
-      trades: toFiniteNumber(match.trades)
+      displayName,
+      username,
+      pseudonym,
+      polymarketUrl,
+      avatarUrl:
+        (typeof searchMatch?.avatarUrl === 'string' && searchMatch.avatarUrl) ||
+        (typeof leaderboardMatch?.avatarUrl === 'string' && leaderboardMatch.avatarUrl) ||
+        null,
+      rank:
+        (Number.isFinite(Number(searchMatch?.rank)) && Number(searchMatch.rank)) ||
+        (Number.isFinite(Number(leaderboardMatch?.rank)) && Number(leaderboardMatch.rank)) ||
+        null,
+      roi: toFiniteNumber(searchMatch?.roi) ?? toFiniteNumber(leaderboardMatch?.roi),
+      pnl: toFiniteNumber(searchMatch?.pnl) ?? toFiniteNumber(leaderboardMatch?.pnl),
+      volume: toFiniteNumber(searchMatch?.volume) ?? toFiniteNumber(leaderboardMatch?.volume),
+      trades: toFiniteNumber(searchMatch?.trades) ?? toFiniteNumber(leaderboardMatch?.trades)
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -2598,10 +2640,27 @@ app.get('/api/users/:address/overview', async (req, res) => {
       status: 'position_open'
     }));
 
+    const normalizedAddress = address.toLowerCase();
+    const resolvedProfile = {
+      address: normalizedAddress,
+      displayName:
+        (typeof profile?.displayName === 'string' && profile.displayName.trim()) ||
+        `${normalizedAddress.slice(0, 6)}...${normalizedAddress.slice(-4)}`,
+      username: typeof profile?.username === 'string' ? profile.username : null,
+      pseudonym: typeof profile?.pseudonym === 'string' ? profile.pseudonym : null,
+      polymarketUrl: typeof profile?.polymarketUrl === 'string' ? profile.polymarketUrl : null,
+      avatarUrl: typeof profile?.avatarUrl === 'string' ? profile.avatarUrl : null,
+      rank: Number.isFinite(Number(profile?.rank)) ? Number(profile.rank) : null,
+      roi: toFiniteNumber(profile?.roi),
+      pnl: toFiniteNumber(profile?.pnl) ?? toFiniteNumber(pnlData?.pnl),
+      volume: toFiniteNumber(profile?.volume) ?? toFiniteNumber(snapshot?.notionalVolume),
+      trades: toFiniteNumber(profile?.trades) ?? toFiniteNumber(pnlData?.tradeCount)
+    };
+
     res.json({
       address: address.toLowerCase(),
       period,
-      profile,
+      profile: resolvedProfile,
       trades,
       pnl: pnlData,
       portfolio: {
