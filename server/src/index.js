@@ -1524,8 +1524,10 @@ async function captureTraderHistory(address) {
     const trades = await fetchUserTrades(address, { period: 'all', limit: 200 });
     const pnlData = computePnlFromTrades(trades);
     const snapshot = computePortfolioSnapshotFromTrades(trades);
+    const now = Date.now();
     const historyEntry = {
-      timestamp: Date.now(),
+      timestamp: now,
+      isoTimestamp: new Date(now).toISOString(),
       pnl: pnlData.pnl,
       tradeCount: Number.isFinite(pnlData.tradeCount) ? pnlData.tradeCount : trades.length,
       notionalVolume: snapshot.notionalVolume,
@@ -1534,6 +1536,20 @@ async function captureTraderHistory(address) {
       tradesLoaded: trades.length
     };
     const historyQueue = analyticsCache.traderHistory.get(address) || [];
+    const previous = historyQueue[0];
+    const hasChange =
+      !previous ||
+      previous.pnl !== historyEntry.pnl ||
+      previous.tradeCount !== historyEntry.tradeCount ||
+      previous.notionalVolume !== historyEntry.notionalVolume ||
+      previous.marketCount !== historyEntry.marketCount ||
+      previous.openPositions !== historyEntry.openPositions ||
+      previous.tradesLoaded !== historyEntry.tradesLoaded;
+
+    if (!hasChange) {
+      return previous;
+    }
+
     historyQueue.unshift(historyEntry);
     if (historyQueue.length > 12) {
       historyQueue.pop();
@@ -1545,6 +1561,60 @@ async function captureTraderHistory(address) {
     console.warn(`Failed to capture analytics history for ${address}`, message);
     return null;
   }
+}
+
+function normalizeHistoryTimestamps(history) {
+  return history.map((entry) => {
+    const ts = Number(entry?.timestamp);
+    const isValidTs = Number.isFinite(ts) && ts > 0;
+    const normalizedTs = isValidTs ? ts : Date.now();
+    return {
+      ...entry,
+      timestamp: normalizedTs,
+      isoTimestamp: typeof entry?.isoTimestamp === 'string' ? entry.isoTimestamp : new Date(normalizedTs).toISOString()
+    };
+  });
+}
+
+function computeHistoryDeltas(history) {
+  if (!Array.isArray(history) || history.length === 0) {
+    return {
+      pnl24h: null,
+      pnl7d: null,
+      volume24h: null,
+      volume7d: null,
+      tradeCount24h: null,
+      tradeCount7d: null
+    };
+  }
+
+  const latest = history[0];
+  const latestTs = Number(latest.timestamp);
+  if (!Number.isFinite(latestTs)) {
+    return {
+      pnl24h: null,
+      pnl7d: null,
+      volume24h: null,
+      volume7d: null,
+      tradeCount24h: null,
+      tradeCount7d: null
+    };
+  }
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const point24h = history.find((entry) => Number(entry.timestamp) <= latestTs - dayMs) || history[history.length - 1];
+  const point7d = history.find((entry) => Number(entry.timestamp) <= latestTs - dayMs * 7) || history[history.length - 1];
+
+  const safeDelta = (a, b) => (Number.isFinite(Number(a)) && Number.isFinite(Number(b)) ? Number(a) - Number(b) : null);
+
+  return {
+    pnl24h: safeDelta(latest.pnl, point24h?.pnl),
+    pnl7d: safeDelta(latest.pnl, point7d?.pnl),
+    volume24h: safeDelta(latest.notionalVolume, point24h?.notionalVolume),
+    volume7d: safeDelta(latest.notionalVolume, point7d?.notionalVolume),
+    tradeCount24h: safeDelta(latest.tradeCount, point24h?.tradeCount),
+    tradeCount7d: safeDelta(latest.tradeCount, point7d?.tradeCount)
+  };
 }
 
 async function refreshAnalyticsData() {
@@ -2759,11 +2829,13 @@ app.get('/api/analytics/trader/:address/history', (req, res) => {
   if (!/^0x[a-f0-9]{40}$/.test(normalized)) {
     return res.status(400).json({ error: 'Invalid address' });
   }
-  const history = analyticsCache.traderHistory.get(normalized) || [];
+  const history = normalizeHistoryTimestamps(analyticsCache.traderHistory.get(normalized) || []);
+  const deltas = computeHistoryDeltas(history);
   return res.json({
     address: normalized,
     history,
-    latest: history[0] || null
+    latest: history[0] || null,
+    deltas
   });
 });
 
