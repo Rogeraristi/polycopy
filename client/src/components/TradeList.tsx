@@ -127,9 +127,7 @@ export function TradeList({ trades, onCopy, isCopying, canCopy = true }: TradeLi
           <article key={getKey(trade) || `${trade.created_at}-${trade.price}`} className="card p-5 flex flex-col gap-2">
             <header className="flex items-start justify-between gap-4">
               <div className="flex items-center gap-3">
-                <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-800 bg-slate-900">
-                  <MetallicLogo size={32} src={avatar} />
-                </span>
+                <MetallicLogo size={32} src={avatar} />
                 <div>
                   <p className="text-xs uppercase text-slate-400 tracking-wide">{when}</p>
                   <h3 className="text-lg font-semibold text-slate-100">{marketQuestion}</h3>
