@@ -32,10 +32,9 @@ export default function MetallicLogo({ src = '/P_logo.svg', size = 64, animated 
         loading="lazy"
         className="metallic-logo-base block h-full w-full object-contain"
       />
-      <span aria-hidden className="metallic-logo-metal" style={maskStyle} />
       <span
         aria-hidden
-        className="metallic-logo-overlay"
+        className="metallic-logo-sheen"
         style={maskStyle}
       />
     </span>
