@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import GlassPanel from '../components/effects/GlassPanel';
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type AnalyticsSnapshot = {
-  periods: Record<string, Array<{ address: string; rank?: number; displayName?: string }>>;
+  periods: Record<string, LeaderboardEntry[]>;
+  labels?: Record<string, string>;
   defaultPeriod?: string;
 };
 
@@ -17,17 +18,117 @@ type TraderHistoryEntry = {
   openPositions: number;
 };
 
+type TraderHistoryPayload = {
+  address: string;
+  history: TraderHistoryEntry[];
+  latest?: TraderHistoryEntry | null;
+  deltas?: {
+    pnl24h?: number | null;
+    pnl7d?: number | null;
+    volume24h?: number | null;
+    volume7d?: number | null;
+    tradeCount24h?: number | null;
+    tradeCount7d?: number | null;
+  };
+};
+
+type LeaderboardEntry = {
+  address: string;
+  rank?: number;
+  displayName?: string;
+  roi?: number | null;
+  pnl?: number | null;
+  volume?: number | null;
+  trades?: number | null;
+};
+
+type TraderInsight = {
+  address: string;
+  displayName: string;
+  rank: number | null;
+  confidenceScore: number;
+  signal: 'Bullish Momentum' | 'Neutral' | 'Bearish Momentum';
+  roi: number | null;
+  pnl: number | null;
+  volume: number | null;
+  trades: number | null;
+  latestPnl: number | null;
+  pnl24h: number | null;
+  volume24h: number | null;
+  tradeVelocity24h: number | null;
+  consistency: number;
+};
+
+function toNumber(value: unknown): number | null {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function formatUsd(value: number | null) {
+  if (value === null) return '—';
+  return value.toLocaleString(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0
+  });
+}
+
+function formatCompactUsd(value: number | null) {
+  if (value === null) return '—';
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000_000) return `${value < 0 ? '-' : ''}$${(abs / 1_000_000_000).toFixed(1)}B`;
+  if (abs >= 1_000_000) return `${value < 0 ? '-' : ''}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${value < 0 ? '-' : ''}$${(abs / 1_000).toFixed(1)}K`;
+  return `${value < 0 ? '-' : ''}$${abs.toFixed(0)}`;
+}
+
+function formatPercent(value: number | null) {
+  if (value === null) return '—';
+  return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`;
+}
+
+function formatDelta(value: number | null) {
+  if (value === null) return '—';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${formatCompactUsd(value)}`;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function computeConsistency(history: TraderHistoryEntry[]) {
+  if (!Array.isArray(history) || history.length < 2) return 0;
+  const valid = [...history]
+    .map((entry) => ({ t: Number(entry.timestamp), pnl: toNumber(entry.pnl) }))
+    .filter((entry) => Number.isFinite(entry.t) && entry.pnl !== null)
+    .sort((a, b) => a.t - b.t);
+
+  if (valid.length < 2) return 0;
+
+  let positiveSteps = 0;
+  for (let i = 1; i < valid.length; i += 1) {
+    if ((valid[i].pnl as number) >= (valid[i - 1].pnl as number)) {
+      positiveSteps += 1;
+    }
+  }
+  return positiveSteps / (valid.length - 1);
+}
+
 export default function AnalyticsDashboard() {
   const [analyticsData, setAnalyticsData] = useState<{ snapshot: AnalyticsSnapshot; fetchedAt: number } | null>(
     null
   );
-  const [history, setHistory] = useState<TraderHistoryEntry[]>([]);
+  const [historyByAddress, setHistoryByAddress] = useState<Record<string, TraderHistoryPayload>>({});
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('weekly');
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(false);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setIsLeaderboardLoading(true);
     fetch('/api/analytics/leaderboard')
       .then((res) => {
         if (!res.ok) throw new Error('Failed to load analytics leaderboard');
@@ -36,10 +137,15 @@ export default function AnalyticsDashboard() {
       .then((payload) => {
         if (!cancelled) {
           setAnalyticsData(payload);
+          const nextPeriod = payload?.snapshot?.defaultPeriod || 'weekly';
+          setSelectedPeriod(nextPeriod);
         }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load analytics data');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLeaderboardLoading(false);
       });
     return () => {
       cancelled = true;
@@ -47,50 +153,164 @@ export default function AnalyticsDashboard() {
   }, []);
 
   useEffect(() => {
-    if (!selectedAddress) {
-      setHistory([]);
+    const entries = analyticsData?.snapshot?.periods?.[selectedPeriod];
+    if (!Array.isArray(entries) || entries.length === 0) {
       return;
     }
+
+    const topAddresses = entries
+      .slice(0, 8)
+      .map((entry) => String(entry.address || '').toLowerCase())
+      .filter((address) => /^0x[a-f0-9]{40}$/.test(address));
+
+    if (topAddresses.length === 0) return;
+
     let cancelled = false;
     setIsHistoryLoading(true);
-    fetch(`/api/analytics/trader/${selectedAddress}/history`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to load trader history');
-        return res.json();
-      })
-      .then((payload) => {
-        if (!cancelled) {
-          setHistory(payload.history || []);
+
+    Promise.all(
+      topAddresses.map(async (address) => {
+        const res = await fetch(`/api/analytics/trader/${address}/history`);
+        if (!res.ok) {
+          throw new Error(`Failed to load trader history (${address})`);
         }
+        return (await res.json()) as TraderHistoryPayload;
+      })
+    )
+      .then((payloads) => {
+        if (cancelled) return;
+        setHistoryByAddress((previous) => {
+          const next = { ...previous };
+          payloads.forEach((payload) => {
+            if (!payload?.address) return;
+            next[payload.address.toLowerCase()] = payload;
+          });
+          return next;
+        });
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load trader history');
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load trader history');
+        }
       })
       .finally(() => {
         if (!cancelled) setIsHistoryLoading(false);
       });
+
     return () => {
       cancelled = true;
     };
-  }, [selectedAddress]);
+  }, [analyticsData, selectedPeriod]);
 
-  const defaultPeriod = analyticsData?.snapshot.defaultPeriod || 'weekly';
+  const periodLabels = analyticsData?.snapshot.labels || {};
+  const periodKeys = useMemo(() => {
+    const keys = Object.keys(analyticsData?.snapshot.periods || {});
+    return keys.filter((key) => Array.isArray(analyticsData?.snapshot.periods?.[key]));
+  }, [analyticsData]);
+
   const leaderboardEntries = useMemo(() => {
-    const periodData = analyticsData?.snapshot.periods?.[defaultPeriod] || [];
+    const periodData = analyticsData?.snapshot.periods?.[selectedPeriod] || [];
     return Array.isArray(periodData) ? periodData.slice(0, 12) : [];
-  }, [analyticsData, defaultPeriod]);
+  }, [analyticsData, selectedPeriod]);
+
+  useEffect(() => {
+    if (!selectedAddress && leaderboardEntries.length > 0) {
+      setSelectedAddress(leaderboardEntries[0].address.toLowerCase());
+      return;
+    }
+    if (selectedAddress && !leaderboardEntries.some((entry) => entry.address.toLowerCase() === selectedAddress)) {
+      setSelectedAddress(leaderboardEntries[0]?.address?.toLowerCase() || null);
+    }
+  }, [leaderboardEntries, selectedAddress]);
+
+  const traderInsights = useMemo<TraderInsight[]>(() => {
+    return leaderboardEntries.map((entry) => {
+      const address = String(entry.address || '').toLowerCase();
+      const history = historyByAddress[address]?.history || [];
+      const deltas = historyByAddress[address]?.deltas || {};
+      const latest = historyByAddress[address]?.latest || history[0] || null;
+      const consistency = computeConsistency(history);
+      const roi = toNumber(entry.roi);
+      const pnl = toNumber(entry.pnl);
+      const volume = toNumber(entry.volume);
+      const trades = toNumber(entry.trades);
+      const pnl24h = toNumber(deltas.pnl24h);
+      const volume24h = toNumber(deltas.volume24h);
+      const tradeVelocity24h = toNumber(deltas.tradeCount24h);
+
+      const roiScore = clamp(((roi ?? 0) + 20) / 120, 0, 1);
+      const pnlScore = clamp(Math.log10(Math.max(1, Math.abs(pnl ?? 0))) / 6, 0, 1);
+      const volumeScore = clamp(Math.log10(Math.max(1, Math.abs(volume ?? 0))) / 7, 0, 1);
+      const momentumScore = clamp(((pnl24h ?? 0) + 50_000) / 100_000, 0, 1);
+      const activityScore = clamp((tradeVelocity24h ?? 0) / 30, 0, 1);
+
+      const confidenceScore = Math.round(
+        (roiScore * 0.23 + pnlScore * 0.22 + volumeScore * 0.2 + momentumScore * 0.2 + consistency * 0.1 + activityScore * 0.05) *
+          100
+      );
+
+      let signal: TraderInsight['signal'] = 'Neutral';
+      if ((pnl24h ?? 0) > 0 && consistency >= 0.55) signal = 'Bullish Momentum';
+      if ((pnl24h ?? 0) < 0 && consistency < 0.45) signal = 'Bearish Momentum';
+
+      return {
+        address,
+        displayName: entry.displayName || `${address.slice(0, 6)}…${address.slice(-4)}`,
+        rank: toNumber(entry.rank),
+        confidenceScore,
+        signal,
+        roi,
+        pnl,
+        volume,
+        trades,
+        latestPnl: toNumber(latest?.pnl),
+        pnl24h,
+        volume24h,
+        tradeVelocity24h,
+        consistency
+      };
+    });
+  }, [leaderboardEntries, historyByAddress]);
+
+  const consensusView = useMemo(() => {
+    if (traderInsights.length === 0) {
+      return { bullish: 0, bearish: 0, neutral: 0, headline: 'No signal yet' };
+    }
+    const bullish = traderInsights.filter((entry) => entry.signal === 'Bullish Momentum').length;
+    const bearish = traderInsights.filter((entry) => entry.signal === 'Bearish Momentum').length;
+    const neutral = Math.max(0, traderInsights.length - bullish - bearish);
+
+    let headline = 'Top traders are mixed right now';
+    if (bullish >= Math.max(3, bearish + 2)) headline = 'Risk-on regime from top traders';
+    if (bearish >= Math.max(3, bullish + 2)) headline = 'Defensive regime from top traders';
+
+    return { bullish, bearish, neutral, headline };
+  }, [traderInsights]);
+
+  const selectedHistory = useMemo(() => {
+    if (!selectedAddress) return [];
+    return (historyByAddress[selectedAddress]?.history || []).slice().sort((a, b) => a.timestamp - b.timestamp);
+  }, [historyByAddress, selectedAddress]);
 
   const chartData = useMemo(
-    () =>
-      history
-        .slice(0, 12)
+    () => {
+      return selectedHistory
+        .slice(-12)
         .map((entry) => ({
           ...entry,
-          label: new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          label: new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          pnl: toNumber(entry.pnl),
+          notionalVolume: toNumber(entry.notionalVolume)
         }))
-        .reverse(),
-    [history]
+        .reverse();
+    },
+    [selectedHistory]
   );
+
+  const selectedInsight = useMemo(() => {
+    if (!selectedAddress) return null;
+    return traderInsights.find((entry) => entry.address === selectedAddress) || null;
+  }, [traderInsights, selectedAddress]);
 
   return (
     <div className="min-h-screen bg-[#040712] text-slate-100">
@@ -108,21 +328,69 @@ export default function AnalyticsDashboard() {
               Back to leaderboard
             </RouterLink>
           </div>
+          <p className="text-sm text-slate-300">
+            Use top-trader momentum, consistency, and participation to build your own directional view before entering markets.
+          </p>
           {analyticsData?.fetchedAt && (
             <p className="text-xs text-slate-400">
               Snapshot taken {new Date(analyticsData.fetchedAt).toLocaleTimeString()} from Polymarket.
             </p>
           )}
+          {periodKeys.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {periodKeys.map((periodKey) => {
+                const active = selectedPeriod === periodKey;
+                return (
+                  <button
+                    key={periodKey}
+                    type="button"
+                    onClick={() => setSelectedPeriod(periodKey)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] transition ${
+                      active
+                        ? 'bg-blue-600 text-white shadow shadow-blue-500/30'
+                        : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    {periodLabels[periodKey] || periodKey}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {error && <p className="text-sm text-rose-300">{error}</p>}
         </GlassPanel>
 
         <GlassPanel className="rounded-3xl p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Top analytics leaderboard</h2>
-            <span className="text-xs text-slate-400 uppercase tracking-[0.3em]">{defaultPeriod}</span>
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase text-slate-500">Consensus</p>
+              <p className="mt-1 text-sm font-semibold text-white">{consensusView.headline}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase text-slate-500">Bullish</p>
+              <p className="mt-1 text-xl font-semibold text-emerald-300">{consensusView.bullish}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase text-slate-500">Bearish</p>
+              <p className="mt-1 text-xl font-semibold text-rose-300">{consensusView.bearish}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-3">
+              <p className="text-[11px] uppercase text-slate-500">Neutral</p>
+              <p className="mt-1 text-xl font-semibold text-slate-200">{consensusView.neutral}</p>
+            </div>
           </div>
+        </GlassPanel>
+
+        <GlassPanel className="rounded-3xl p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-white">Top trader prediction signals</h2>
+            <span className="text-xs text-slate-400 uppercase tracking-[0.3em]">
+              {periodLabels[selectedPeriod] || selectedPeriod}
+            </span>
+          </div>
+          {isLeaderboardLoading && <p className="text-sm text-slate-400">Loading leaderboard snapshot…</p>}
           <div className="grid gap-3 md:grid-cols-2">
-            {leaderboardEntries.map((entry) => (
+            {traderInsights.map((entry) => (
               <button
                 key={entry.address}
                 type="button"
@@ -134,10 +402,27 @@ export default function AnalyticsDashboard() {
                 }`}
               >
                 <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
-                  Rank {entry.rank || '—'}
+                  Rank {entry.rank || '—'} · Confidence {entry.confidenceScore}/100
                 </span>
-                <span className="text-base font-semibold text-white">{entry.displayName || entry.address}</span>
-                <span className="text-xs text-slate-500">{entry.address}</span>
+                <span className="text-base font-semibold text-white">{entry.displayName}</span>
+                <span
+                  className={`text-xs font-semibold ${
+                    entry.signal === 'Bullish Momentum'
+                      ? 'text-emerald-300'
+                      : entry.signal === 'Bearish Momentum'
+                      ? 'text-rose-300'
+                      : 'text-slate-300'
+                  }`}
+                >
+                  {entry.signal}
+                </span>
+                <div className="mt-1 grid grid-cols-2 gap-2 text-[11px] text-slate-400">
+                  <span>ROI {formatPercent(entry.roi)}</span>
+                  <span>24h PnL {formatDelta(entry.pnl24h)}</span>
+                  <span>Volume {formatCompactUsd(entry.volume)}</span>
+                  <span>24h Trades {entry.tradeVelocity24h ?? '—'}</span>
+                </div>
+                <span className="mt-1 text-xs text-slate-500">{entry.address}</span>
               </button>
             ))}
           </div>
@@ -158,11 +443,39 @@ export default function AnalyticsDashboard() {
                 Clear selection
               </button>
             </div>
+            {selectedInsight && (
+              <div className="grid grid-cols-2 gap-3 text-xs text-slate-300 sm:grid-cols-6">
+                <div>
+                  <p className="text-[11px] uppercase text-slate-500">Signal</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{selectedInsight.signal}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase text-slate-500">Confidence</p>
+                  <p className="mt-1 text-sm font-semibold text-blue-300">{selectedInsight.confidenceScore}/100</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase text-slate-500">ROI</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{formatPercent(selectedInsight.roi)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase text-slate-500">Total PnL</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{formatUsd(selectedInsight.pnl)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase text-slate-500">24h Volume</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{formatCompactUsd(selectedInsight.volume24h)}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase text-slate-500">Consistency</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-100">{Math.round(selectedInsight.consistency * 100)}%</p>
+                </div>
+              </div>
+            )}
             {isHistoryLoading && <p className="text-sm text-slate-400">Loading history…</p>}
-            {!isHistoryLoading && history.length === 0 && (
+            {!isHistoryLoading && selectedHistory.length === 0 && (
               <p className="text-sm text-slate-400">No history captured yet for this trader.</p>
             )}
-            {history.length > 0 && (
+            {selectedHistory.length > 0 && (
               <div className="space-y-4">
                 <div className="h-48">
                   <ResponsiveContainer width="100%" height="100%">
@@ -174,7 +487,16 @@ export default function AnalyticsDashboard() {
                         contentStyle={{ backgroundColor: '#020617', border: '1px solid #334155' }}
                         labelStyle={{ color: '#cbd5e1' }}
                       />
+                      <Legend />
                       <Line type="monotone" dataKey="pnl" stroke="#22c55e" strokeWidth={2} dot={false} name="PnL" />
+                      <Line
+                        type="monotone"
+                        dataKey="notionalVolume"
+                        stroke="#f59e0b"
+                        strokeWidth={2}
+                        dot={false}
+                        name="Notional volume"
+                      />
                       <Line type="monotone" dataKey="tradeCount" stroke="#60a5fa" strokeWidth={2} dot={false} name="Trades" />
                     </LineChart>
                   </ResponsiveContainer>
@@ -183,20 +505,28 @@ export default function AnalyticsDashboard() {
                   <div>
                     <p className="text-[11px] uppercase text-slate-500">Last PnL</p>
                     <p className="mt-1 text-sm font-semibold text-emerald-300">
-                      {history[0].pnl === null ? '—' : `$${history[0].pnl.toFixed(2)}`}
+                      {selectedHistory[selectedHistory.length - 1].pnl === null
+                        ? '—'
+                        : `$${selectedHistory[selectedHistory.length - 1].pnl?.toFixed(2)}`}
                     </p>
                   </div>
                   <div>
                     <p className="text-[11px] uppercase text-slate-500">Trades</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-100">{history[0].tradeCount}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">
+                      {selectedHistory[selectedHistory.length - 1].tradeCount}
+                    </p>
                   </div>
                   <div>
                     <p className="text-[11px] uppercase text-slate-500">Market Count</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-100">{history[0].marketCount}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">
+                      {selectedHistory[selectedHistory.length - 1].marketCount}
+                    </p>
                   </div>
                   <div>
                     <p className="text-[11px] uppercase text-slate-500">Open Positions</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-100">{history[0].openPositions}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-100">
+                      {selectedHistory[selectedHistory.length - 1].openPositions}
+                    </p>
                   </div>
                 </div>
               </div>
