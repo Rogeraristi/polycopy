@@ -743,8 +743,7 @@ function filterTradesByPeriod(trades, period) {
   if (windowMs === null) return trades;
   const cutoff = Date.now() - windowMs;
   return trades.filter((trade) => {
-    const ts = trade?.created_at || trade?.createdAt || trade?.timestamp || trade?.time;
-    const parsed = new Date(ts).getTime();
+    const parsed = extractTradeTimestamp(trade);
     return Number.isFinite(parsed) && parsed >= cutoff;
   });
 }
@@ -2885,7 +2884,7 @@ wss.on('connection', (ws, req) => {
     if (closed) return;
     const trades = await fetchUserTrades(address);
     const freshTrades = trades.filter((trade) => {
-      const createdAt = new Date(trade.created_at || trade.createdAt || trade.timestamp || 0).getTime();
+      const createdAt = extractTradeTimestamp(trade);
       if (!Number.isFinite(createdAt)) return true;
       return createdAt > lastTimestamp;
     });
@@ -2893,7 +2892,9 @@ wss.on('connection', (ws, req) => {
     if (freshTrades.length > 0) {
       lastTimestamp = Math.max(
         lastTimestamp,
-        ...freshTrades.map((trade) => new Date(trade.created_at || trade.createdAt || trade.timestamp || 0).getTime())
+        ...freshTrades
+          .map((trade) => extractTradeTimestamp(trade))
+          .filter((createdAt) => Number.isFinite(createdAt))
       );
       ws.send(JSON.stringify({ type: 'trades', trades: freshTrades }));
     }

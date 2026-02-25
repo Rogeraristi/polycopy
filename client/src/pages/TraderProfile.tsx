@@ -89,16 +89,23 @@ function formatUsd(value: number | null) {
 
 function normalizeTimestampMs(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;
+  const minReasonableMs = Date.UTC(2015, 0, 1);
+  const maxReasonableMs = Date.now() + 1000 * 60 * 60 * 24 * 366;
+  const normalizeRange = (ms: number): number | null => {
+    if (!Number.isFinite(ms)) return null;
+    if (ms < minReasonableMs || ms > maxReasonableMs) return null;
+    return Math.round(ms);
+  };
   if (value instanceof Date) {
-    const ms = value.getTime();
-    return Number.isFinite(ms) ? ms : null;
+    return normalizeRange(value.getTime());
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) return null;
     const abs = Math.abs(value);
-    if (abs < 1e11) return Math.round(value * 1000); // seconds
-    if (abs > 1e14) return Math.round(value / 1000); // microseconds
-    return Math.round(value); // milliseconds
+    if (abs < 1e11) return normalizeRange(value * 1000); // seconds
+    if (abs > 1e17) return normalizeRange(value / 1_000_000); // nanoseconds
+    if (abs > 1e14) return normalizeRange(value / 1000); // microseconds
+    return normalizeRange(value); // milliseconds
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -106,9 +113,27 @@ function normalizeTimestampMs(value: unknown): number | null {
     const numeric = Number(trimmed);
     if (Number.isFinite(numeric)) return normalizeTimestampMs(numeric);
     const parsed = new Date(trimmed).getTime();
-    return Number.isFinite(parsed) ? parsed : null;
+    return normalizeRange(parsed);
+  }
+  if (typeof value === 'object' && value !== null) {
+    const map = value as Record<string, unknown>;
+    const candidate =
+      map.timestamp ?? map.time ?? map.created_at ?? map.createdAt ?? map.executedAt ?? map.updatedAt ?? map._seconds ?? null;
+    if (candidate !== null) {
+      const normalized = normalizeTimestampMs(candidate);
+      if (normalized !== null) return normalized;
+    }
+    if (Number.isFinite(Number(map.seconds)) || Number.isFinite(Number(map.nanoseconds))) {
+      const seconds = Number(map.seconds || 0);
+      const nanos = Number(map.nanoseconds || 0);
+      return normalizeRange(seconds * 1000 + nanos / 1_000_000);
+    }
   }
   return null;
+}
+
+function getTradeRawTimestamp(trade: Trade): unknown {
+  return trade.created_at || trade.createdAt || trade.timestamp || trade.time || trade.executedAt || trade.updatedAt || null;
 }
 
 export default function TraderProfile() {
@@ -358,7 +383,7 @@ export default function TraderProfile() {
         const history = Array.isArray(payload?.history) ? payload.history : [];
         const normalized = history
           .map((entry: any) => ({
-            timestamp: Number(entry?.timestamp),
+            timestamp: normalizeTimestampMs(entry?.timestamp ?? entry?.isoTimestamp ?? null) ?? NaN,
             isoTimestamp: typeof entry?.isoTimestamp === 'string' ? entry.isoTimestamp : undefined,
             pnl: typeof entry?.pnl === 'number' ? entry.pnl : null,
             tradeCount: Number(entry?.tradeCount || 0),
@@ -390,8 +415,8 @@ export default function TraderProfile() {
         trade.id ||
         trade.transaction_hash ||
         trade.txid ||
-        `${trade.created_at || trade.createdAt || trade.timestamp || 't'}-${i}`,
-      dateMs: normalizeTimestampMs(trade.created_at || trade.createdAt || trade.timestamp || null),
+        `${getTradeRawTimestamp(trade) || 't'}-${i}`,
+      dateMs: normalizeTimestampMs(getTradeRawTimestamp(trade)),
       market:
         (typeof trade.market === 'string' ? trade.market : trade.market?.question || trade.market?.title) ||
         trade.marketId ||
@@ -443,7 +468,7 @@ export default function TraderProfile() {
         'Unknown market';
       markets.add(String(market));
 
-      const ts = normalizeTimestampMs(trade.created_at || trade.createdAt || trade.timestamp || null) ?? NaN;
+      const ts = normalizeTimestampMs(getTradeRawTimestamp(trade)) ?? NaN;
       if (Number.isFinite(ts)) {
         latestTimestamp = Math.max(latestTimestamp, ts);
       }
@@ -460,7 +485,7 @@ export default function TraderProfile() {
   }, [trades]);
 
   const baseSeries = useMemo(() => {
-    if (analyticsHistory.length > 0) {
+    if (analyticsHistory.length >= 2) {
       return [...analyticsHistory]
         .sort((a, b) => a.timestamp - b.timestamp)
         .map((entry) => ({
@@ -473,25 +498,36 @@ export default function TraderProfile() {
 
     const withTimes = trades
       .map((trade, index) => {
-        const rawTime = trade.created_at || trade.createdAt || trade.timestamp || null;
-        const ts = normalizeTimestampMs(rawTime) ?? NaN;
-        if (!Number.isFinite(ts)) return null;
+        const ts = normalizeTimestampMs(getTradeRawTimestamp(trade)) ?? NaN;
         const side = String(trade.side || trade.type || '').toLowerCase();
         const size = Number(trade.amount || trade.size || trade.shares || 0);
         const price = Number(trade.price || 0);
         const signedCashflow = Number.isFinite(size) && Number.isFinite(price) ? (side === 'sell' ? 1 : -1) * size * price : 0;
         return { ts, signedCashflow, index };
       })
-      .filter(Boolean) as Array<{ ts: number; signedCashflow: number; index: number }>;
+      .filter((point) => Number.isFinite(point.ts)) as Array<{ ts: number; signedCashflow: number; index: number }>;
 
-    if (withTimes.length === 0) {
+    // If source trades omit usable timestamps, synthesize a monotonic timeline so the curve still renders.
+    const points =
+      withTimes.length >= 2
+        ? withTimes
+        : trades.map((trade, index) => {
+            const side = String(trade.side || trade.type || '').toLowerCase();
+            const size = Number(trade.amount || trade.size || trade.shares || 0);
+            const price = Number(trade.price || 0);
+            const signedCashflow = Number.isFinite(size) && Number.isFinite(price) ? (side === 'sell' ? 1 : -1) * size * price : 0;
+            const baseTs = Date.now() - (trades.length - index) * 60_000;
+            return { ts: baseTs, signedCashflow, index };
+          });
+
+    if (points.length === 0) {
       return [];
     }
 
-    withTimes.sort((a, b) => a.ts - b.ts || a.index - b.index);
+    points.sort((a, b) => a.ts - b.ts || a.index - b.index);
 
     let runningPnl = 0;
-    const actualPoints = withTimes.map((point) => {
+    const actualPoints = points.map((point) => {
       runningPnl += point.signedCashflow;
       return {
         ts: point.ts,
@@ -547,7 +583,7 @@ export default function TraderProfile() {
     return [...baseSeries, ...projection];
   }, [baseSeries, projectionEnabled, projectionMode]);
 
-  const usesAnalyticsHistory = analyticsHistory.length > 0;
+  const usesAnalyticsHistory = analyticsHistory.length >= 2;
 
   const actualSeries = useMemo(
     () =>
