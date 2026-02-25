@@ -136,6 +136,12 @@ const leaderboardCache = {
   snapshot: null
 };
 
+const analyticsCache = {
+  leaderboard: null,
+  leaderboardFetchedAt: 0,
+  traderHistory: new Map()
+};
+
 const breakingNewsCache = {
   expiresAt: 0,
   payload: null
@@ -1497,6 +1503,65 @@ async function fetchLeaderboardSnapshots(limit = LEADERBOARD_LIMIT) {
   };
 }
 
+function getTopTraderAddresses(snapshot) {
+  if (!snapshot || !snapshot.periods) return [];
+  const addresses = new Set();
+  Object.values(snapshot.periods)
+    .filter(Array.isArray)
+    .forEach((bucket) => {
+      bucket.forEach((entry) => {
+        if (entry && typeof entry.address === 'string') {
+          addresses.add(entry.address.toLowerCase());
+        }
+      });
+    });
+  return Array.from(addresses);
+}
+
+async function captureTraderHistory(address) {
+  if (!/^0x[a-f0-9]{40}$/.test(address)) return null;
+  try {
+    const trades = await fetchUserTrades(address, { period: 'all', limit: 200 });
+    const pnlData = computePnlFromTrades(trades);
+    const snapshot = computePortfolioSnapshotFromTrades(trades);
+    const historyEntry = {
+      timestamp: Date.now(),
+      pnl: pnlData.pnl,
+      tradeCount: Number.isFinite(pnlData.tradeCount) ? pnlData.tradeCount : trades.length,
+      notionalVolume: snapshot.notionalVolume,
+      marketCount: snapshot.marketCount,
+      openPositions: snapshot.openPositions.length,
+      tradesLoaded: trades.length
+    };
+    const historyQueue = analyticsCache.traderHistory.get(address) || [];
+    historyQueue.unshift(historyEntry);
+    if (historyQueue.length > 12) {
+      historyQueue.pop();
+    }
+    analyticsCache.traderHistory.set(address, historyQueue);
+    return historyEntry;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Failed to capture analytics history for ${address}`, message);
+    return null;
+  }
+}
+
+async function refreshAnalyticsData() {
+  try {
+    const snapshot = await fetchLeaderboardSnapshots(LEADERBOARD_LIMIT);
+    analyticsCache.leaderboard = snapshot;
+    analyticsCache.leaderboardFetchedAt = Date.now();
+    const addresses = getTopTraderAddresses(snapshot).slice(0, 24);
+    for (const address of addresses) {
+      await captureTraderHistory(address);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn('Analytics refresh failed', message);
+  }
+}
+
 function searchTradersFromLeaderboardSnapshot(query, limit = 8) {
   const trimmed = typeof query === 'string' ? query.trim().toLowerCase() : '';
   if (!trimmed) return [];
@@ -2679,7 +2744,35 @@ app.get('/api/users/:address/overview', async (req, res) => {
   }
 });
 
+app.get('/api/analytics/leaderboard', (_req, res) => {
+  if (!analyticsCache.leaderboard) {
+    return res.status(503).json({ error: 'Analytics data is warming up. Try again shortly.' });
+  }
+  res.json({
+    snapshot: analyticsCache.leaderboard,
+    fetchedAt: analyticsCache.leaderboardFetchedAt || null
+  });
+});
+
+app.get('/api/analytics/trader/:address/history', (req, res) => {
+  const normalized = String(req.params.address || '').toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalized)) {
+    return res.status(400).json({ error: 'Invalid address' });
+  }
+  const history = analyticsCache.traderHistory.get(normalized) || [];
+  return res.json({
+    address: normalized,
+    history,
+    latest: history[0] || null
+  });
+});
+
 const server = http.createServer(app);
+
+refreshAnalyticsData();
+setInterval(() => {
+  void refreshAnalyticsData();
+}, 5 * 60 * 1000);
 
 const wss = new WebSocketServer({ server, path: '/ws/trades' });
 

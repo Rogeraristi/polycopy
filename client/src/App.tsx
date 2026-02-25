@@ -12,6 +12,7 @@ import { useTraderSearch } from './hooks/useTraderSearch';
 import { useWalletConnection } from './hooks/useWalletConnection';
 import TraderProfile from './pages/TraderProfile';
 import MetallicLogoPreviewPage from './pages/MetallicLogoPreviewPage';
+import AnalyticsDashboard from './pages/AnalyticsDashboard';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 const ENABLE_BEAMS = String(import.meta.env.VITE_ENABLE_BEAMS || 'false').toLowerCase() === 'true';
@@ -259,6 +260,12 @@ function TopNav({
               className={`transition ${currentPath === '/leaderboard' ? 'text-white' : 'hover:text-white text-slate-300'}`}
             >
               Leaderboard
+            </Link>
+            <Link
+              to="/analytics"
+              className={`transition ${currentPath === '/analytics' ? 'text-white' : 'hover:text-white text-slate-300'}`}
+            >
+              Analytics
             </Link>
           </nav>
         </div>
@@ -634,6 +641,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
+        <Route path="/analytics" element={<AnalyticsDashboard />} />
         <Route path="/profile/:address" element={<TraderProfile />} />
         <Route path="/logo-preview" element={<MetallicLogoPreviewPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
