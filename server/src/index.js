@@ -706,10 +706,13 @@ function computePnlFromTrades(trades) {
     return acc + (side === 'sell' ? 1 : -1) * size * price;
   }, 0);
 
-  const pnl = hasExplicitRealised ? realisedFromPayload : Number(fallbackExposure.toFixed(4));
+  const pnl = hasExplicitRealised ? realisedFromPayload : null;
   return {
     pnl,
-    calculation: hasExplicitRealised ? 'sum_of_trade_realized_pnl_fields' : 'fallback_net_cashflow_proxy',
+    cashflowProxy: Number(fallbackExposure.toFixed(4)),
+    calculation: hasExplicitRealised
+      ? 'sum_of_trade_realized_pnl_fields'
+      : 'unavailable_no_realized_pnl_fields_using_cashflow_proxy',
     tradeCount: trades.length
   };
 }
@@ -1520,14 +1523,18 @@ function getTopTraderAddresses(snapshot) {
 async function captureTraderHistory(address) {
   if (!/^0x[a-f0-9]{40}$/.test(address)) return null;
   try {
-    const trades = await fetchUserTrades(address, { period: 'all', limit: 200 });
+    const [trades, profile] = await Promise.all([
+      fetchUserTrades(address, { period: 'all', limit: 200 }),
+      fetchTraderProfileSummary(address)
+    ]);
     const pnlData = computePnlFromTrades(trades);
     const snapshot = computePortfolioSnapshotFromTrades(trades);
+    const resolvedPnl = toFiniteNumber(profile?.pnl) ?? pnlData.pnl;
     const now = Date.now();
     const historyEntry = {
       timestamp: now,
       isoTimestamp: new Date(now).toISOString(),
-      pnl: pnlData.pnl,
+      pnl: resolvedPnl,
       tradeCount: Number.isFinite(pnlData.tradeCount) ? pnlData.tradeCount : trades.length,
       notionalVolume: snapshot.notionalVolume,
       marketCount: snapshot.marketCount,
@@ -1958,8 +1965,8 @@ async function enrichWithPortfolioValues(traders) {
     }
     return {
       ...entry,
-      pnl: entry.pnl ?? lookup,
-      // if ROI missing and we have value but no volume, leave ROI null
+      // Position value is not equivalent to realized/unrealized PnL.
+      pnl: entry.pnl ?? null,
       volume: entry.volume ?? null
     };
   });
@@ -2799,9 +2806,9 @@ app.get('/api/users/:address/overview', async (req, res) => {
       avatarUrl: typeof profile?.avatarUrl === 'string' ? profile.avatarUrl : null,
       rank: Number.isFinite(Number(profile?.rank)) ? Number(profile.rank) : null,
       roi: toFiniteNumber(profile?.roi),
-      pnl: toFiniteNumber(profile?.pnl) ?? toFiniteNumber(pnlData?.pnl),
-      volume: toFiniteNumber(profile?.volume) ?? toFiniteNumber(snapshot?.notionalVolume),
-      trades: toFiniteNumber(profile?.trades) ?? toFiniteNumber(pnlData?.tradeCount)
+      pnl: toFiniteNumber(profile?.pnl),
+      volume: toFiniteNumber(profile?.volume),
+      trades: toFiniteNumber(profile?.trades)
     };
 
     res.json({

@@ -35,6 +35,7 @@ type OverviewPayload = {
   trades?: Trade[];
   pnl?: {
     pnl?: number | null;
+    cashflowProxy?: number | null;
     tradeCount?: number;
     calculation?: string;
   };
@@ -288,6 +289,16 @@ export default function TraderProfile() {
     };
   }, [trades]);
 
+  const displayedPnl = useMemo(() => {
+    if (typeof profile?.pnl === 'number' && Number.isFinite(profile.pnl)) {
+      return profile.pnl;
+    }
+    if (typeof overview?.pnl?.pnl === 'number' && Number.isFinite(overview.pnl.pnl)) {
+      return overview.pnl.pnl;
+    }
+    return null;
+  }, [profile?.pnl, overview?.pnl?.pnl]);
+
   const pnlCurve = useMemo(() => {
     const chron = [...trades]
       .map((trade, index) => ({
@@ -408,9 +419,9 @@ export default function TraderProfile() {
           <>
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
               <GlassPanel className="rounded-xl border border-slate-800/80 p-3 xl:col-span-2">
-                <p className="text-[11px] uppercase text-slate-500">PnL</p>
-                <p className={`mt-1 text-lg font-semibold ${(overview?.pnl?.pnl || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                  {formatCompactUsd(overview?.pnl?.pnl)}
+                <p className="text-[11px] uppercase text-slate-500">PnL (Profile)</p>
+                <p className={`mt-1 text-lg font-semibold ${(displayedPnl || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  {formatCompactUsd(displayedPnl)}
                 </p>
               </GlassPanel>
               <GlassPanel className="rounded-xl border border-slate-800/80 p-3 xl:col-span-2">
@@ -418,22 +429,26 @@ export default function TraderProfile() {
                 <p className="mt-1 text-lg font-semibold text-slate-100">{formatCompactUsd(overview?.portfolio?.portfolioValue)}</p>
               </GlassPanel>
               <GlassPanel className="rounded-xl border border-slate-800/80 p-3">
-                <p className="text-[11px] uppercase text-slate-500">Trades</p>
-                <p className="mt-1 text-lg font-semibold text-slate-100">{overview?.pnl?.tradeCount ?? trades.length}</p>
-              </GlassPanel>
-              <GlassPanel className="rounded-xl border border-slate-800/80 p-3">
-                <p className="text-[11px] uppercase text-slate-500">Markets</p>
+                <p className="text-[11px] uppercase text-slate-500">Trades (Profile)</p>
                 <p className="mt-1 text-lg font-semibold text-slate-100">
-                  {overview?.portfolio?.marketCount ?? metrics.uniqueMarkets}
+                  {typeof profile?.trades === 'number' ? profile.trades.toLocaleString() : '—'}
                 </p>
               </GlassPanel>
               <GlassPanel className="rounded-xl border border-slate-800/80 p-3">
-                <p className="text-[11px] uppercase text-slate-500">Avg Notional</p>
-                <p className="mt-1 text-lg font-semibold text-slate-100">{formatCompactUsd(metrics.averageNotional)}</p>
+                <p className="text-[11px] uppercase text-slate-500">Volume (Profile)</p>
+                <p className="mt-1 text-lg font-semibold text-slate-100">
+                  {formatCompactUsd(profile?.volume)}
+                </p>
               </GlassPanel>
               <GlassPanel className="rounded-xl border border-slate-800/80 p-3">
-                <p className="text-[11px] uppercase text-slate-500">Active Days</p>
-                <p className="mt-1 text-lg font-semibold text-slate-100">{metrics.activeDays}</p>
+                <p className="text-[11px] uppercase text-slate-500">ROI (Profile)</p>
+                <p className="mt-1 text-lg font-semibold text-slate-100">{formatPercent(profile?.roi)}</p>
+              </GlassPanel>
+              <GlassPanel className="rounded-xl border border-slate-800/80 p-3">
+                <p className="text-[11px] uppercase text-slate-500">Net Cashflow</p>
+                <p className={`mt-1 text-lg font-semibold ${(overview?.pnl?.cashflowProxy || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  {formatCompactUsd(overview?.pnl?.cashflowProxy)}
+                </p>
               </GlassPanel>
             </section>
 
@@ -441,11 +456,18 @@ export default function TraderProfile() {
               <div className="flex flex-wrap gap-2 text-xs text-slate-400">
                 <span className="rounded-full border border-slate-700 px-2 py-1">Notional: {formatUsd(overview?.portfolio?.notionalVolume ?? metrics.totalNotional, 0)}</span>
                 <span className="rounded-full border border-slate-700 px-2 py-1">Buy/Sell: {metrics.buyCount}/{metrics.sellCount}</span>
+                <span className="rounded-full border border-slate-700 px-2 py-1">Markets (fills): {metrics.uniqueMarkets}</span>
+                <span className="rounded-full border border-slate-700 px-2 py-1">Active Days: {metrics.activeDays}</span>
                 <span className="rounded-full border border-slate-700 px-2 py-1">Last trade: {metrics.latestTradeTs ? new Date(metrics.latestTradeTs).toLocaleString() : '—'}</span>
                 <span className="rounded-full border border-slate-700 px-2 py-1">24h PnL: {formatUsd(history?.deltas?.pnl24h)}</span>
                 <span className="rounded-full border border-slate-700 px-2 py-1">7d PnL: {formatUsd(history?.deltas?.pnl7d)}</span>
                 <span className="rounded-full border border-slate-700 px-2 py-1">24h Vol: {formatUsd(history?.deltas?.volume24h, 0)}</span>
                 <span className="rounded-full border border-slate-700 px-2 py-1">7d Vol: {formatUsd(history?.deltas?.volume7d, 0)}</span>
+                {typeof displayedPnl !== 'number' && (
+                  <span className="rounded-full border border-amber-700/70 px-2 py-1 text-amber-300">
+                    PnL unavailable from public fills for this wallet
+                  </span>
+                )}
               </div>
             </GlassPanel>
 
