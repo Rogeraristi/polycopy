@@ -234,9 +234,11 @@ export function Leaderboard({
   const third = sorted.find((entry) => entry.rank === 3) || sorted[2] || null;
   const rest = sorted.filter((entry) => ![first?.address, second?.address, third?.address].includes(entry.address));
 
+  const orderedEntries = [first, second, third, ...rest].filter(Boolean) as LeaderboardEntry[];
+
   if (isLoading) {
     return (
-      <GlassPanel className="rounded-3xl p-6 space-y-6">
+      <GlassPanel className="rounded-3xl p-4 space-y-5 sm:p-6 sm:space-y-6">
         <div className="flex items-center justify-between">
           <div className="h-8 w-56 animate-pulse rounded bg-slate-800/80" />
           <div className="h-8 w-40 animate-pulse rounded-full bg-slate-800/80" />
@@ -251,37 +253,39 @@ export function Leaderboard({
   }
 
   return (
-    <GlassPanel className="rounded-3xl p-6 space-y-6">
+    <GlassPanel className="rounded-3xl p-4 space-y-5 sm:p-6 sm:space-y-6">
       <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="space-y-1">
-          <h2 className="text-2xl font-semibold text-white">Top Polymarket traders</h2>
+          <h2 className="text-xl font-semibold text-white sm:text-2xl">Top Polymarket traders</h2>
           <p className="text-sm text-slate-400">Click any trader to open their profile and inspect full metrics.</p>
         </div>
         {hasPeriodControls && (
-          <nav className="flex shrink-0 items-center gap-1 rounded-full border border-slate-800/60 bg-slate-900/60 p-1 text-xs font-medium text-slate-300">
-            {periodOptions.map((option) => {
-              const isActive = option.key === selectedPeriod;
-              return (
-                <button
-                  key={option.key}
-                  type="button"
-                  onClick={() => {
-                    if (onPeriodChange && !isActive) onPeriodChange(option.key);
-                  }}
-                  aria-pressed={isActive}
-                  className={`rounded-full px-3 py-1 transition ${
-                    isActive ? 'bg-blue-600 text-white shadow shadow-blue-500/30' : 'hover:bg-slate-800/70'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              );
-            })}
-          </nav>
+          <div className="w-full overflow-x-auto md:w-auto md:overflow-visible">
+            <nav className="flex min-w-max shrink-0 items-center gap-1 rounded-full border border-slate-800/60 bg-slate-900/60 p-1 text-xs font-medium text-slate-300">
+              {periodOptions.map((option) => {
+                const isActive = option.key === selectedPeriod;
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => {
+                      if (onPeriodChange && !isActive) onPeriodChange(option.key);
+                    }}
+                    aria-pressed={isActive}
+                    className={`rounded-full px-3 py-1 transition ${
+                      isActive ? 'bg-blue-600 text-white shadow shadow-blue-500/30' : 'hover:bg-slate-800/70'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
         )}
       </header>
 
-      <div className="grid gap-3 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-3 md:grid-cols-[minmax(0,1fr),130px,130px,auto]">
+      <div className="grid gap-2 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-3 sm:gap-3 md:grid-cols-[minmax(0,1fr),130px,130px,auto]">
         <input
           type="text"
           placeholder="Filter by trader name, username, or wallet"
@@ -308,7 +312,7 @@ export function Leaderboard({
         <button
           type="button"
           onClick={clearFilters}
-          className="rounded-xl border border-slate-700/80 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500"
+          className="rounded-xl border border-slate-700/80 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:border-slate-500 md:min-w-[90px]"
         >
           Clear
         </button>
@@ -325,7 +329,41 @@ export function Leaderboard({
             <div className="reveal reveal-2">{third && <PodiumCard entry={third} onSelect={onSelect} onPrefetch={onPrefetch} compact />}</div>
           </div>
 
-          <div className="overflow-x-auto rounded-2xl border border-slate-800/60 bg-slate-900/50 reveal reveal-1">
+          <div className="space-y-3 md:hidden">
+            {orderedEntries.map((trader) => {
+              const isSelected = selectedAddress === trader.address;
+              return (
+                <button
+                  key={trader.address}
+                  type="button"
+                  onClick={() => onSelect(trader.address, trader)}
+                  onMouseEnter={() => onPrefetch?.(trader.address, trader)}
+                  className={`w-full rounded-2xl border p-3 text-left transition ${
+                    isSelected ? 'border-blue-400/60 bg-blue-500/10' : 'border-slate-800/60 bg-slate-900/50 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <img src={getAvatar(trader)} alt={`${trader.displayName} avatar`} className="h-9 w-9 rounded-full object-cover" loading="lazy" />
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-100">{trader.displayName}</p>
+                        <p className="truncate text-xs text-slate-500">{trader.address}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-200">#{trader.rank}</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <p className={`${trader.roi !== null && trader.roi >= 0 ? 'text-emerald-300' : 'text-rose-300'} font-semibold`}>ROI {formatPercent(trader.roi)}</p>
+                    <p className="text-slate-200">P&L {formatUsd(trader.pnl)}</p>
+                    <p className="text-slate-300">Vol {formatUsd(trader.volume)}</p>
+                    <p className="text-slate-300">Trades {formatNumber(trader.trades)}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-2xl border border-slate-800/60 bg-slate-900/50 reveal reveal-1 md:block">
             <table className="min-w-full text-sm">
               <thead className="border-b border-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-400">
                 <tr>
@@ -338,8 +376,7 @@ export function Leaderboard({
                 </tr>
               </thead>
               <tbody>
-                {[first, second, third, ...rest].filter(Boolean).map((entry, idx) => {
-                  const trader = entry as LeaderboardEntry;
+                {orderedEntries.map((trader) => {
                   const isSelected = selectedAddress === trader.address;
                   // Color rows for 1st, 2nd, 3rd
                   let rowColor = '';
