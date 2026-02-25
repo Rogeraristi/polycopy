@@ -51,6 +51,26 @@ type TraderProfileSummary = {
   trades?: number | null;
 };
 
+type AnalyticsHistoryEntry = {
+  timestamp: number;
+  isoTimestamp?: string;
+  pnl: number | null;
+  tradeCount: number;
+  notionalVolume: number;
+  marketCount: number;
+  openPositions: number;
+  tradesLoaded: number;
+};
+
+type AnalyticsHistoryDeltas = {
+  pnl24h: number | null;
+  pnl7d: number | null;
+  volume24h: number | null;
+  volume7d: number | null;
+  tradeCount24h: number | null;
+  tradeCount7d: number | null;
+};
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 const OVERVIEW_CACHE_TTL_MS = 1000 * 60 * 3;
 
@@ -77,9 +97,13 @@ export default function TraderProfile() {
   const [openOrders, setOpenOrders] = useState<OpenOrdersPayload | null>(null);
   const [leaderboardContext, setLeaderboardContext] = useState<LeaderboardContextEntry | null>(navigationEntry);
   const [profileSummary, setProfileSummary] = useState<TraderProfileSummary | null>(null);
+  const [analyticsHistory, setAnalyticsHistory] = useState<AnalyticsHistoryEntry[]>([]);
+  const [analyticsDeltas, setAnalyticsDeltas] = useState<AnalyticsHistoryDeltas | null>(null);
   const [period, setPeriod] = useState<'today' | 'weekly' | 'monthly' | 'all'>('all');
+  const [projectionEnabled, setProjectionEnabled] = useState(true);
   const [projectionMode, setProjectionMode] = useState<'conservative' | 'base' | 'aggressive'>('base');
-  const [zoomPreset, setZoomPreset] = useState<'7d' | '30d' | '90d' | 'all' | 'custom'>('90d');
+  const [zoomPreset, setZoomPreset] = useState<'1m' | '1y' | 'ytd' | 'max' | 'custom'>('1y');
+  const [performanceView, setPerformanceView] = useState<'current' | 'average'>('current');
   const [brushRange, setBrushRange] = useState<{ startIndex: number; endIndex: number }>({ startIndex: 0, endIndex: 0 });
   const [refreshTick, setRefreshTick] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -292,6 +316,50 @@ export default function TraderProfile() {
     };
   }, [address, period, refreshTick, navigationEntry]);
 
+  useEffect(() => {
+    if (!address) return;
+    let cancelled = false;
+    const controller = new AbortController();
+
+    fetch(`${API_BASE}/analytics/trader/${address}/history`, {
+      signal: controller.signal,
+      credentials: 'include'
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        return response.json();
+      })
+      .then((payload) => {
+        if (cancelled || !payload) return;
+        const history = Array.isArray(payload?.history) ? payload.history : [];
+        const normalized = history
+          .map((entry: any) => ({
+            timestamp: Number(entry?.timestamp),
+            isoTimestamp: typeof entry?.isoTimestamp === 'string' ? entry.isoTimestamp : undefined,
+            pnl: typeof entry?.pnl === 'number' ? entry.pnl : null,
+            tradeCount: Number(entry?.tradeCount || 0),
+            notionalVolume: Number(entry?.notionalVolume || 0),
+            marketCount: Number(entry?.marketCount || 0),
+            openPositions: Number(entry?.openPositions || 0),
+            tradesLoaded: Number(entry?.tradesLoaded || 0)
+          }))
+          .filter((entry) => Number.isFinite(entry.timestamp) && entry.timestamp > 0);
+        setAnalyticsHistory(normalized);
+        setAnalyticsDeltas(payload?.deltas || null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAnalyticsHistory([]);
+          setAnalyticsDeltas(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [address, refreshTick]);
+
   const tradeRows = useMemo(() => {
     return trades.map((trade, i) => ({
       id:
@@ -367,7 +435,18 @@ export default function TraderProfile() {
     };
   }, [trades]);
 
-  const chartSeries = useMemo(() => {
+  const baseSeries = useMemo(() => {
+    if (analyticsHistory.length > 0) {
+      return [...analyticsHistory]
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .map((entry) => ({
+          ts: entry.timestamp,
+          label: new Date(entry.timestamp).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+          actualPnl: entry.pnl,
+          projectedPnl: null as number | null
+        }));
+    }
+
     const withTimes = trades
       .map((trade, index) => {
         const rawTime = trade.created_at || trade.createdAt || trade.timestamp || null;
@@ -398,15 +477,18 @@ export default function TraderProfile() {
       };
     });
 
-    if (actualPoints.length < 2) {
-      return actualPoints;
-    }
+    return actualPoints;
+  }, [analyticsHistory, trades]);
+
+  const chartSeries = useMemo(() => {
+    if (baseSeries.length === 0) return [];
+    if (!projectionEnabled || baseSeries.length < 2) return baseSeries;
 
     // Linear trend projection for 180 days from the latest known point.
     const lookbackMs = 90 * 24 * 60 * 60 * 1000;
-    const latestTs = actualPoints[actualPoints.length - 1].ts;
-    const windowed = actualPoints.filter((point) => point.ts >= latestTs - lookbackMs);
-    const basis = windowed.length >= 2 ? windowed : actualPoints.slice(-Math.min(actualPoints.length, 30));
+    const latestTs = baseSeries[baseSeries.length - 1].ts;
+    const windowed = baseSeries.filter((point) => point.ts >= latestTs - lookbackMs);
+    const basis = windowed.length >= 2 ? windowed : baseSeries.slice(-Math.min(baseSeries.length, 30));
 
     const n = basis.length;
     const xs = basis.map((point) => point.ts);
@@ -438,8 +520,56 @@ export default function TraderProfile() {
       };
     });
 
-    return [...actualPoints, ...projection];
-  }, [trades, projectionMode]);
+    return [...baseSeries, ...projection];
+  }, [baseSeries, projectionEnabled, projectionMode]);
+
+  const usesAnalyticsHistory = analyticsHistory.length > 0;
+
+  const actualSeries = useMemo(
+    () =>
+      chartSeries
+        .filter((point) => Number.isFinite(Number(point.actualPnl)))
+        .map((point) => ({ ts: Number(point.ts), pnl: Number(point.actualPnl) }))
+        .sort((a, b) => a.ts - b.ts),
+    [chartSeries]
+  );
+
+  const performanceStats = useMemo(() => {
+    if (actualSeries.length < 2) {
+      return { d1: null, w1: null, m1: null, ytd: null, y1: null, max: null } as Record<string, number | null>;
+    }
+    const latest = actualSeries[actualSeries.length - 1];
+    const latestTs = latest.ts;
+    const latestPnl = latest.pnl;
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const findBaseline = (targetTs: number) =>
+      actualSeries.find((entry) => entry.ts >= targetTs)?.pnl ?? actualSeries[0].pnl;
+    const startOfYearTs = new Date(new Date(latestTs).getFullYear(), 0, 1).getTime();
+    const maxBaseline = actualSeries[0].pnl;
+
+    const current = {
+      d1: latestPnl - findBaseline(latestTs - oneDayMs),
+      w1: latestPnl - findBaseline(latestTs - oneDayMs * 7),
+      m1: latestPnl - findBaseline(latestTs - oneDayMs * 30),
+      ytd: latestPnl - findBaseline(startOfYearTs),
+      y1: latestPnl - findBaseline(latestTs - oneDayMs * 365),
+      max: latestPnl - maxBaseline
+    } as Record<string, number>;
+
+    if (performanceView === 'current') {
+      return current;
+    }
+
+    const avg = (delta: number, days: number) => delta / days;
+    return {
+      d1: avg(current.d1, 1),
+      w1: avg(current.w1, 7),
+      m1: avg(current.m1, 30),
+      ytd: avg(current.ytd, Math.max(1, Math.floor((latestTs - startOfYearTs) / oneDayMs))),
+      y1: avg(current.y1, 365),
+      max: avg(current.max, Math.max(1, Math.floor((latestTs - actualSeries[0].ts) / oneDayMs)))
+    } as Record<string, number>;
+  }, [actualSeries, performanceView]);
 
   useEffect(() => {
     if (chartSeries.length === 0) {
@@ -447,9 +577,25 @@ export default function TraderProfile() {
       return;
     }
 
-    const visibleDays = zoomPreset === '7d' ? 7 : zoomPreset === '30d' ? 30 : zoomPreset === '90d' ? 90 : chartSeries.length;
     const endIndex = chartSeries.length - 1;
-    const startIndex = zoomPreset === 'all' ? 0 : Math.max(0, endIndex - visibleDays + 1);
+    const latestTs = Number(chartSeries[endIndex]?.ts || 0);
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const startOfYearTs = new Date(new Date(latestTs).getFullYear(), 0, 1).getTime();
+    const thresholdTs =
+      zoomPreset === '1m'
+        ? latestTs - oneDayMs * 30
+        : zoomPreset === '1y'
+        ? latestTs - oneDayMs * 365
+        : zoomPreset === 'ytd'
+        ? startOfYearTs
+        : Number.NEGATIVE_INFINITY;
+    const startIndex =
+      zoomPreset === 'max'
+        ? 0
+        : Math.max(
+            0,
+            chartSeries.findIndex((point) => Number(point.ts) >= thresholdTs)
+          );
     setBrushRange({ startIndex, endIndex });
   }, [chartSeries.length, zoomPreset]);
 
@@ -600,21 +746,80 @@ export default function TraderProfile() {
             <section className="space-y-3 rounded-2xl border border-slate-800/60 bg-slate-950/70 p-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold">Performance Curve</h2>
-                <p className="text-xs text-slate-400">Live trade-derived PnL with 180-day trend projection</p>
+                <p className="text-xs text-slate-400">
+                  {usesAnalyticsHistory ? 'Analytics history from cached leaderboard snapshots' : 'Trade-derived PnL from fill history'}
+                </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-400">Portfolio Performance</span>
+                <button
+                  type="button"
+                  onClick={() => setPerformanceView('current')}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    performanceView === 'current' ? 'bg-blue-600 text-white' : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  Current
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPerformanceView('average')}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    performanceView === 'average' ? 'bg-blue-600 text-white' : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                  }`}
+                >
+                  Average
+                </button>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs sm:grid-cols-6">
                 {[
-                  { key: '7d', label: '7D' },
-                  { key: '30d', label: '30D' },
-                  { key: '90d', label: '90D' },
-                  { key: 'all', label: 'All' }
+                  { key: 'd1', label: '1D' },
+                  { key: 'w1', label: '1W' },
+                  { key: 'm1', label: '1M' },
+                  { key: 'ytd', label: 'YTD' },
+                  { key: 'y1', label: '1Y' },
+                  { key: 'max', label: 'MAX' }
+                ].map((entry) => {
+                  const value = performanceStats[entry.key];
+                  return (
+                    <div key={entry.key} className="rounded-xl border border-slate-800/70 bg-slate-900/50 px-2 py-2">
+                      <p className="uppercase text-slate-500">{entry.label}</p>
+                      <p className={`mt-1 font-semibold ${value !== null && value >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                        {value === null ? '—' : `${formatUsd(value)}${performanceView === 'average' ? '/day' : ''}`}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+              {usesAnalyticsHistory && analyticsDeltas && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="rounded-full border border-slate-700 px-2 py-1 text-slate-300">
+                    24h PnL {formatUsd(analyticsDeltas.pnl24h)}
+                  </span>
+                  <span className="rounded-full border border-slate-700 px-2 py-1 text-slate-300">
+                    7d PnL {formatUsd(analyticsDeltas.pnl7d)}
+                  </span>
+                  <span className="rounded-full border border-slate-700 px-2 py-1 text-slate-300">
+                    24h Vol {formatUsd(analyticsDeltas.volume24h)}
+                  </span>
+                  <span className="rounded-full border border-slate-700 px-2 py-1 text-slate-300">
+                    7d Vol {formatUsd(analyticsDeltas.volume7d)}
+                  </span>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {[
+                  { key: '1m', label: '1M' },
+                  { key: '1y', label: '1Y' },
+                  { key: 'ytd', label: 'YTD' },
+                  { key: 'max', label: 'Max' }
                 ].map((option) => {
                   const active = zoomPreset === option.key;
                   return (
                     <button
                       key={option.key}
                       type="button"
-                      onClick={() => setZoomPreset(option.key as '7d' | '30d' | '90d' | 'all')}
+                      onClick={() => setZoomPreset(option.key as '1m' | '1y' | 'ytd' | 'max')}
                       className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
                         active ? 'bg-blue-600 text-white' : 'border border-slate-700 text-slate-300 hover:border-slate-500'
                       }`}
@@ -623,27 +828,37 @@ export default function TraderProfile() {
                     </button>
                   );
                 })}
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex flex-wrap items-center gap-2">
                   <span className="text-xs text-slate-400">Projection</span>
-                  {[
-                    { key: 'conservative', label: 'Conservative' },
-                    { key: 'base', label: 'Base' },
-                    { key: 'aggressive', label: 'Aggressive' }
-                  ].map((option) => {
-                    const active = projectionMode === option.key;
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => setProjectionMode(option.key as 'conservative' | 'base' | 'aggressive')}
-                        className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                          active ? 'bg-slate-200 text-slate-900' : 'border border-slate-700 text-slate-300 hover:border-slate-500'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
+                  <button
+                    type="button"
+                    onClick={() => setProjectionEnabled((prev) => !prev)}
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                      projectionEnabled ? 'bg-blue-600 text-white' : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                    }`}
+                  >
+                    {projectionEnabled ? '180D On' : '180D Off'}
+                  </button>
+                  {projectionEnabled &&
+                    [
+                      { key: 'conservative', label: 'Conservative' },
+                      { key: 'base', label: 'Base' },
+                      { key: 'aggressive', label: 'Aggressive' }
+                    ].map((option) => {
+                      const active = projectionMode === option.key;
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => setProjectionMode(option.key as 'conservative' | 'base' | 'aggressive')}
+                          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                            active ? 'bg-slate-200 text-slate-900' : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
               {chartSeries.length > 1 ? (
