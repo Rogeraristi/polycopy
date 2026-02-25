@@ -1565,9 +1565,8 @@ async function captureTraderHistory(address) {
 
 function normalizeHistoryTimestamps(history) {
   return history.map((entry) => {
-    const ts = Number(entry?.timestamp);
-    const isValidTs = Number.isFinite(ts) && ts > 0;
-    const normalizedTs = isValidTs ? ts : Date.now();
+    const normalizedTs =
+      normaliseTimestampMillis(entry?.timestamp ?? entry?.isoTimestamp ?? null) || Date.now();
     return {
       ...entry,
       timestamp: normalizedTs,
@@ -1577,7 +1576,7 @@ function normalizeHistoryTimestamps(history) {
 }
 
 function computeHistoryDeltas(history) {
-  if (!Array.isArray(history) || history.length === 0) {
+  if (!Array.isArray(history) || history.length < 2) {
     return {
       pnl24h: null,
       pnl7d: null,
@@ -1588,7 +1587,21 @@ function computeHistoryDeltas(history) {
     };
   }
 
-  const latest = history[0];
+  const sorted = [...history]
+    .filter((entry) => Number.isFinite(Number(entry?.timestamp)))
+    .sort((a, b) => Number(b.timestamp) - Number(a.timestamp));
+  if (sorted.length < 2) {
+    return {
+      pnl24h: null,
+      pnl7d: null,
+      volume24h: null,
+      volume7d: null,
+      tradeCount24h: null,
+      tradeCount7d: null
+    };
+  }
+
+  const latest = sorted[0];
   const latestTs = Number(latest.timestamp);
   if (!Number.isFinite(latestTs)) {
     return {
@@ -1602,18 +1615,18 @@ function computeHistoryDeltas(history) {
   }
 
   const dayMs = 24 * 60 * 60 * 1000;
-  const point24h = history.find((entry) => Number(entry.timestamp) <= latestTs - dayMs) || history[history.length - 1];
-  const point7d = history.find((entry) => Number(entry.timestamp) <= latestTs - dayMs * 7) || history[history.length - 1];
+  const point24h = sorted.find((entry) => Number(entry.timestamp) <= latestTs - dayMs) || null;
+  const point7d = sorted.find((entry) => Number(entry.timestamp) <= latestTs - dayMs * 7) || null;
 
   const safeDelta = (a, b) => (Number.isFinite(Number(a)) && Number.isFinite(Number(b)) ? Number(a) - Number(b) : null);
 
   return {
-    pnl24h: safeDelta(latest.pnl, point24h?.pnl),
-    pnl7d: safeDelta(latest.pnl, point7d?.pnl),
-    volume24h: safeDelta(latest.notionalVolume, point24h?.notionalVolume),
-    volume7d: safeDelta(latest.notionalVolume, point7d?.notionalVolume),
-    tradeCount24h: safeDelta(latest.tradeCount, point24h?.tradeCount),
-    tradeCount7d: safeDelta(latest.tradeCount, point7d?.tradeCount)
+    pnl24h: point24h ? safeDelta(latest.pnl, point24h?.pnl) : null,
+    pnl7d: point7d ? safeDelta(latest.pnl, point7d?.pnl) : null,
+    volume24h: point24h ? safeDelta(latest.notionalVolume, point24h?.notionalVolume) : null,
+    volume7d: point7d ? safeDelta(latest.notionalVolume, point7d?.notionalVolume) : null,
+    tradeCount24h: point24h ? safeDelta(latest.tradeCount, point24h?.tradeCount) : null,
+    tradeCount7d: point7d ? safeDelta(latest.tradeCount, point7d?.tradeCount) : null
   };
 }
 
@@ -2824,12 +2837,19 @@ app.get('/api/analytics/leaderboard', (_req, res) => {
   });
 });
 
-app.get('/api/analytics/trader/:address/history', (req, res) => {
+app.get('/api/analytics/trader/:address/history', async (req, res) => {
   const normalized = String(req.params.address || '').toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(normalized)) {
     return res.status(400).json({ error: 'Invalid address' });
   }
-  const history = normalizeHistoryTimestamps(analyticsCache.traderHistory.get(normalized) || []);
+
+  if (!analyticsCache.traderHistory.has(normalized)) {
+    await captureTraderHistory(normalized);
+  }
+
+  const history = normalizeHistoryTimestamps(analyticsCache.traderHistory.get(normalized) || []).sort(
+    (a, b) => Number(b.timestamp) - Number(a.timestamp)
+  );
   const deltas = computeHistoryDeltas(history);
   return res.json({
     address: normalized,

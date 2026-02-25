@@ -87,6 +87,30 @@ function formatUsd(value: number | null) {
   });
 }
 
+function normalizeTimestampMs(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null;
+    const abs = Math.abs(value);
+    if (abs < 1e11) return Math.round(value * 1000); // seconds
+    if (abs > 1e14) return Math.round(value / 1000); // microseconds
+    return Math.round(value); // milliseconds
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) return normalizeTimestampMs(numeric);
+    const parsed = new Date(trimmed).getTime();
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 export default function TraderProfile() {
   const { address } = useParams<{ address: string }>();
   const location = useLocation();
@@ -367,7 +391,7 @@ export default function TraderProfile() {
         trade.transaction_hash ||
         trade.txid ||
         `${trade.created_at || trade.createdAt || trade.timestamp || 't'}-${i}`,
-      date: trade.created_at || trade.createdAt || trade.timestamp || null,
+      dateMs: normalizeTimestampMs(trade.created_at || trade.createdAt || trade.timestamp || null),
       market:
         (typeof trade.market === 'string' ? trade.market : trade.market?.question || trade.market?.title) ||
         trade.marketId ||
@@ -419,7 +443,7 @@ export default function TraderProfile() {
         'Unknown market';
       markets.add(String(market));
 
-      const ts = new Date((trade.created_at || trade.createdAt || trade.timestamp || 0) as any).getTime();
+      const ts = normalizeTimestampMs(trade.created_at || trade.createdAt || trade.timestamp || null) ?? NaN;
       if (Number.isFinite(ts)) {
         latestTimestamp = Math.max(latestTimestamp, ts);
       }
@@ -450,7 +474,7 @@ export default function TraderProfile() {
     const withTimes = trades
       .map((trade, index) => {
         const rawTime = trade.created_at || trade.createdAt || trade.timestamp || null;
-        const ts = rawTime ? new Date(rawTime).getTime() : NaN;
+        const ts = normalizeTimestampMs(rawTime) ?? NaN;
         if (!Number.isFinite(ts)) return null;
         const side = String(trade.side || trade.type || '').toLowerCase();
         const size = Number(trade.amount || trade.size || trade.shares || 0);
@@ -970,7 +994,7 @@ export default function TraderProfile() {
                     <tbody>
                       {tradeRows.map((row) => (
                         <tr key={row.id} className="border-t border-slate-800/60">
-                          <td className="px-3 py-2">{row.date ? new Date(row.date).toLocaleString() : '—'}</td>
+                          <td className="px-3 py-2">{row.dateMs ? new Date(row.dateMs).toLocaleString() : '—'}</td>
                           <td className="px-3 py-2">{row.market}</td>
                           <td className="px-3 py-2">{row.side}</td>
                           <td className="px-3 py-2 text-right">{Number.isFinite(row.size) ? row.size.toFixed(4) : '—'}</td>
