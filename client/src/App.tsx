@@ -643,10 +643,7 @@ function AppLoaderSplash({ fadeOut }: { fadeOut: boolean }) {
       }`}
       aria-hidden="true"
     >
-      <div className="flex flex-col items-center gap-4">
-        <img src="/polycopy-loader.gif" alt="Loading PolyCopy" className="h-28 w-28 rounded-2xl" />
-        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-300">Loading PolyCopy</p>
-      </div>
+      <img src="/polycopy-loader.gif" alt="Loading PolyCopy" className="h-36 w-36 rounded-2xl" />
     </div>
   );
 }
