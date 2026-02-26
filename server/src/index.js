@@ -1523,9 +1523,10 @@ function getTopTraderAddresses(snapshot) {
 async function captureTraderHistory(address) {
   if (!/^0x[a-f0-9]{40}$/.test(address)) return null;
   try {
-    const [trades, profile] = await Promise.all([
+    const [trades, profile, portfolioValue] = await Promise.all([
       fetchUserTrades(address, { period: 'all', limit: 200 }),
-      fetchTraderProfileSummary(address)
+      fetchTraderProfileSummary(address),
+      fetchUserTotalPositionValue(address)
     ]);
     const pnlData = computePnlFromTrades(trades);
     const snapshot = computePortfolioSnapshotFromTrades(trades);
@@ -1537,6 +1538,7 @@ async function captureTraderHistory(address) {
       pnl: resolvedPnl,
       tradeCount: Number.isFinite(pnlData.tradeCount) ? pnlData.tradeCount : trades.length,
       notionalVolume: snapshot.notionalVolume,
+      portfolioValue: toFiniteNumber(portfolioValue),
       marketCount: snapshot.marketCount,
       openPositions: snapshot.openPositions.length,
       tradesLoaded: trades.length
@@ -1557,7 +1559,7 @@ async function captureTraderHistory(address) {
     }
 
     historyQueue.unshift(historyEntry);
-    if (historyQueue.length > 12) {
+    if (historyQueue.length > 288) {
       historyQueue.pop();
     }
     analyticsCache.traderHistory.set(address, historyQueue);
@@ -1588,6 +1590,8 @@ function computeHistoryDeltas(history) {
       pnl7d: null,
       volume24h: null,
       volume7d: null,
+      portfolioValue24h: null,
+      portfolioValue7d: null,
       tradeCount24h: null,
       tradeCount7d: null
     };
@@ -1602,6 +1606,8 @@ function computeHistoryDeltas(history) {
       pnl7d: null,
       volume24h: null,
       volume7d: null,
+      portfolioValue24h: null,
+      portfolioValue7d: null,
       tradeCount24h: null,
       tradeCount7d: null
     };
@@ -1615,6 +1621,8 @@ function computeHistoryDeltas(history) {
       pnl7d: null,
       volume24h: null,
       volume7d: null,
+      portfolioValue24h: null,
+      portfolioValue7d: null,
       tradeCount24h: null,
       tradeCount7d: null
     };
@@ -1631,6 +1639,8 @@ function computeHistoryDeltas(history) {
     pnl7d: point7d ? safeDelta(latest.pnl, point7d?.pnl) : null,
     volume24h: point24h ? safeDelta(latest.notionalVolume, point24h?.notionalVolume) : null,
     volume7d: point7d ? safeDelta(latest.notionalVolume, point7d?.notionalVolume) : null,
+    portfolioValue24h: point24h ? safeDelta(latest.portfolioValue, point24h?.portfolioValue) : null,
+    portfolioValue7d: point7d ? safeDelta(latest.portfolioValue, point7d?.portfolioValue) : null,
     tradeCount24h: point24h ? safeDelta(latest.tradeCount, point24h?.tradeCount) : null,
     tradeCount7d: point7d ? safeDelta(latest.tradeCount, point7d?.tradeCount) : null
   };
@@ -1924,6 +1934,132 @@ async function fetchUserTotalPositionValue(address) {
     }
     return null;
   }
+}
+
+function normalisePositionsPayload(payload) {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload.results)) return payload.results;
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.positions)) return payload.positions;
+  if (payload?.data && Array.isArray(payload.data?.positions)) return payload.data.positions;
+  if (payload?.results && Array.isArray(payload.results?.positions)) return payload.results.positions;
+  return [];
+}
+
+async function fetchUserPositions(address, limit = 250) {
+  const normalised = typeof address === 'string' ? address.trim().toLowerCase() : '';
+  if (!/^0x[a-f0-9]{40}$/.test(normalised)) {
+    return [];
+  }
+
+  const resolvedLimit = String(Math.max(25, Math.min(Number(limit) || 250, 500)));
+  const attempts = [
+    `${POLYMARKET_DATA_API_BASE}/positions?${new URLSearchParams({ user: normalised, limit: resolvedLimit }).toString()}`,
+    `${POLYMARKET_DATA_API_BASE}/positions?${new URLSearchParams({ proxyWallet: normalised, limit: resolvedLimit }).toString()}`,
+    `${POLYMARKET_DATA_API_BASE}/positions?${new URLSearchParams({ account: normalised, limit: resolvedLimit }).toString()}`,
+    `${POLYMARKET_BASE}/positions?${new URLSearchParams({ user: normalised, limit: resolvedLimit }).toString()}`
+  ];
+
+  for (const url of attempts) {
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': POLYMARKET_DATA_API_USER_AGENT
+        }
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Positions lookup failed (${response.status}): ${text}`);
+      }
+      const payload = await response.json();
+      const rows = normalisePositionsPayload(payload);
+      if (rows.length > 0) {
+        return rows;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!/404|not found/i.test(message)) {
+        console.warn(`Failed to fetch positions from ${url}`, message);
+      }
+    }
+  }
+
+  return [];
+}
+
+function summariseUserPositions(positions) {
+  const mapped = (Array.isArray(positions) ? positions : [])
+    .map((entry) => {
+      const market =
+        entry?.market ??
+        entry?.marketQuestion ??
+        entry?.question ??
+        entry?.title ??
+        entry?.name ??
+        entry?.slug ??
+        entry?.marketSlug ??
+        entry?.conditionId ??
+        'Unknown market';
+      const side = typeof entry?.side === 'string' ? entry.side : typeof entry?.positionSide === 'string' ? entry.positionSide : null;
+      const size =
+        toFiniteNumber(entry?.size) ??
+        toFiniteNumber(entry?.shares) ??
+        toFiniteNumber(entry?.balance) ??
+        toFiniteNumber(entry?.positionSize) ??
+        0;
+      const currentValue =
+        toFiniteNumber(entry?.currentValue) ??
+        toFiniteNumber(entry?.value) ??
+        toFiniteNumber(entry?.valueUsd) ??
+        toFiniteNumber(entry?.usdValue) ??
+        0;
+      const initialValue =
+        toFiniteNumber(entry?.initialValue) ??
+        toFiniteNumber(entry?.costBasis) ??
+        toFiniteNumber(entry?.cost) ??
+        0;
+      const cashPnl =
+        toFiniteNumber(entry?.cashPnl) ??
+        toFiniteNumber(entry?.pnl) ??
+        toFiniteNumber(entry?.profitLoss) ??
+        null;
+      const realizedPnl = toFiniteNumber(entry?.realizedPnl) ?? toFiniteNumber(entry?.realizedPnL) ?? null;
+      return {
+        market: String(market),
+        side: side ? String(side) : null,
+        size,
+        currentValue,
+        initialValue,
+        cashPnl,
+        realizedPnl
+      };
+    })
+    .filter((entry) => entry.currentValue !== 0 || entry.size !== 0);
+
+  const summary = mapped.reduce(
+    (acc, entry) => {
+      acc.currentValue += entry.currentValue;
+      acc.initialValue += entry.initialValue;
+      if (entry.cashPnl !== null) acc.cashPnl += entry.cashPnl;
+      if (entry.realizedPnl !== null) acc.realizedPnl += entry.realizedPnl;
+      return acc;
+    },
+    { currentValue: 0, initialValue: 0, cashPnl: 0, realizedPnl: 0 }
+  );
+
+  return {
+    positions: mapped.sort((a, b) => Math.abs(b.currentValue) - Math.abs(a.currentValue)),
+    summary: {
+      currentValue: Number(summary.currentValue.toFixed(4)),
+      initialValue: Number(summary.initialValue.toFixed(4)),
+      cashPnl: Number(summary.cashPnl.toFixed(4)),
+      realizedPnl: Number(summary.realizedPnl.toFixed(4))
+    }
+  };
 }
 
 async function enrichWithPortfolioValues(traders) {
@@ -2780,12 +2916,14 @@ app.get('/api/users/:address/overview', async (req, res) => {
     const period = typeof req.query?.period === 'string' ? req.query.period : 'all';
     const limit = Number.isFinite(Number(req.query?.limit)) ? Number(req.query.limit) : 150;
     const trades = await fetchUserTrades(address, { period, limit });
-    const [portfolioValue, profile] = await Promise.all([
+    const [portfolioValue, profile, rawPositions] = await Promise.all([
       fetchUserTotalPositionValue(address),
-      fetchTraderProfileSummary(address)
+      fetchTraderProfileSummary(address),
+      fetchUserPositions(address, 300)
     ]);
     const snapshot = computePortfolioSnapshotFromTrades(trades);
     const pnlData = computePnlFromTrades(trades);
+    const { positions, summary: positionsSummary } = summariseUserPositions(rawPositions);
     const openOrders = snapshot.openPositions.map((position) => ({
       market: position.market,
       side: position.side,
@@ -2818,9 +2956,17 @@ app.get('/api/users/:address/overview', async (req, res) => {
       trades,
       pnl: pnlData,
       portfolio: {
-        portfolioValue,
+        portfolioValue: toFiniteNumber(portfolioValue) ?? positionsSummary.currentValue,
         marketCount: snapshot.marketCount,
-        notionalVolume: snapshot.notionalVolume
+        notionalVolume: snapshot.notionalVolume,
+        positionsValue: positionsSummary.currentValue,
+        positionsInitialValue: positionsSummary.initialValue,
+        positionsCashPnl: positionsSummary.cashPnl,
+        positionsRealizedPnl: positionsSummary.realizedPnl
+      },
+      positions: {
+        positions,
+        source: positions.length > 0 ? 'polymarket_positions' : 'unavailable'
       },
       openOrders: {
         openOrders,

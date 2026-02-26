@@ -28,6 +28,16 @@ type TraderProfileSummary = {
   trades?: number | null;
 };
 
+type PositionRow = {
+  market: string;
+  side: string | null;
+  size: number;
+  currentValue: number;
+  initialValue: number;
+  cashPnl: number | null;
+  realizedPnl: number | null;
+};
+
 type OverviewPayload = {
   address: string;
   period: string;
@@ -43,6 +53,14 @@ type OverviewPayload = {
     portfolioValue?: number | null;
     marketCount?: number;
     notionalVolume?: number;
+    positionsValue?: number;
+    positionsInitialValue?: number;
+    positionsCashPnl?: number;
+    positionsRealizedPnl?: number;
+  };
+  positions?: {
+    positions?: PositionRow[];
+    source?: string;
   };
   openOrders?: {
     openOrders?: Array<{
@@ -56,18 +74,23 @@ type OverviewPayload = {
   };
 };
 
+type HistoryPoint = {
+  timestamp: number;
+  pnl: number | null;
+  tradeCount: number;
+  notionalVolume: number;
+  portfolioValue?: number | null;
+};
+
 type HistoryPayload = {
-  history?: Array<{
-    timestamp: number;
-    pnl: number | null;
-    tradeCount: number;
-    notionalVolume: number;
-  }>;
+  history?: HistoryPoint[];
   deltas?: {
     pnl24h?: number | null;
     pnl7d?: number | null;
     volume24h?: number | null;
     volume7d?: number | null;
+    portfolioValue24h?: number | null;
+    portfolioValue7d?: number | null;
   };
 };
 
@@ -163,9 +186,7 @@ export default function TraderProfile() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      setRefreshTick((current) => current + 1);
-    }, 60_000);
+    const interval = window.setInterval(() => setRefreshTick((current) => current + 1), 60_000);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -269,23 +290,16 @@ export default function TraderProfile() {
       marketMap.set(market, current);
     }
 
-    const topMarkets = Array.from(marketMap.entries())
-      .map(([market, stats]) => ({ market, ...stats }))
-      .sort((a, b) => b.notional - a.notional)
-      .slice(0, 8);
-
-    const averageNotional = trades.length > 0 ? totalNotional / trades.length : 0;
-    const latestTradeTs = trades.length > 0 ? getTradeTimestamp(trades[0]) : null;
-
     return {
       buyCount,
       sellCount,
       totalNotional,
       uniqueMarkets: marketMap.size,
       activeDays: activeDaySet.size,
-      averageNotional,
-      latestTradeTs,
-      topMarkets
+      topMarkets: Array.from(marketMap.entries())
+        .map(([market, stats]) => ({ market, ...stats }))
+        .sort((a, b) => b.notional - a.notional)
+        .slice(0, 8)
     };
   }, [trades]);
 
@@ -299,40 +313,12 @@ export default function TraderProfile() {
     return null;
   }, [profile?.pnl, overview?.pnl?.pnl]);
 
-  const pnlCurve = useMemo(() => {
-    const chron = [...trades]
-      .map((trade, index) => ({
-        index,
-        ts: getTradeTimestamp(trade),
-        side: extractTradeSide(trade),
-        size: Math.abs(extractTradeSize(trade)),
-        price: extractTradePrice(trade)
-      }))
-      .filter((row) => row.ts !== null)
-      .sort((a, b) => (a.ts as number) - (b.ts as number));
-
-    let cumulativeCashflow = 0;
-    let cumulativeNotional = 0;
-
-    return chron.map((row) => {
-      const notional = row.size * row.price;
-      cumulativeNotional += Math.abs(notional);
-      cumulativeCashflow += row.side === 'sell' ? notional : -notional;
-      const ts = row.ts as number;
-      return {
-        t: ts,
-        label: new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' }),
-        cumulativeCashflow: Number(cumulativeCashflow.toFixed(2)),
-        cumulativeNotional: Number(cumulativeNotional.toFixed(2))
-      };
-    });
-  }, [trades]);
-
   const historyCurve = useMemo(() => {
     const points = Array.isArray(history?.history) ? history.history : [];
     return [...points]
       .map((entry) => ({
         timestamp: normalizeTimestampMs(entry.timestamp),
+        portfolioValue: Number.isFinite(Number(entry.portfolioValue)) ? Number(entry.portfolioValue) : null,
         pnl: Number.isFinite(Number(entry.pnl)) ? Number(entry.pnl) : null,
         notionalVolume: Number(entry.notionalVolume || 0),
         tradeCount: Number(entry.tradeCount || 0)
@@ -341,11 +327,14 @@ export default function TraderProfile() {
       .sort((a, b) => (a.timestamp as number) - (b.timestamp as number))
       .map((entry) => ({
         label: new Date(entry.timestamp as number).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        portfolioValue: entry.portfolioValue,
         pnl: entry.pnl,
         notionalVolume: entry.notionalVolume,
         tradeCount: entry.tradeCount
       }));
   }, [history]);
+
+  const portfolioSeriesAvailable = historyCurve.some((entry) => typeof entry.portfolioValue === 'number');
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
@@ -425,20 +414,16 @@ export default function TraderProfile() {
                 </p>
               </GlassPanel>
               <GlassPanel className="rounded-xl border border-slate-800/80 p-3 xl:col-span-2">
-                <p className="text-[11px] uppercase text-slate-500">Portfolio Value</p>
+                <p className="text-[11px] uppercase text-slate-500">Portfolio Value (Live)</p>
                 <p className="mt-1 text-lg font-semibold text-slate-100">{formatCompactUsd(overview?.portfolio?.portfolioValue)}</p>
               </GlassPanel>
               <GlassPanel className="rounded-xl border border-slate-800/80 p-3">
                 <p className="text-[11px] uppercase text-slate-500">Trades (Profile)</p>
-                <p className="mt-1 text-lg font-semibold text-slate-100">
-                  {typeof profile?.trades === 'number' ? profile.trades.toLocaleString() : '—'}
-                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-100">{typeof profile?.trades === 'number' ? profile.trades.toLocaleString() : '—'}</p>
               </GlassPanel>
               <GlassPanel className="rounded-xl border border-slate-800/80 p-3">
                 <p className="text-[11px] uppercase text-slate-500">Volume (Profile)</p>
-                <p className="mt-1 text-lg font-semibold text-slate-100">
-                  {formatCompactUsd(profile?.volume)}
-                </p>
+                <p className="mt-1 text-lg font-semibold text-slate-100">{formatCompactUsd(profile?.volume)}</p>
               </GlassPanel>
               <GlassPanel className="rounded-xl border border-slate-800/80 p-3">
                 <p className="text-[11px] uppercase text-slate-500">ROI (Profile)</p>
@@ -454,54 +439,20 @@ export default function TraderProfile() {
 
             <GlassPanel className="rounded-2xl border border-slate-800/80 p-3">
               <div className="flex flex-wrap gap-2 text-xs text-slate-400">
-                <span className="rounded-full border border-slate-700 px-2 py-1">Notional: {formatUsd(overview?.portfolio?.notionalVolume ?? metrics.totalNotional, 0)}</span>
-                <span className="rounded-full border border-slate-700 px-2 py-1">Buy/Sell: {metrics.buyCount}/{metrics.sellCount}</span>
-                <span className="rounded-full border border-slate-700 px-2 py-1">Markets (fills): {metrics.uniqueMarkets}</span>
-                <span className="rounded-full border border-slate-700 px-2 py-1">Active Days: {metrics.activeDays}</span>
-                <span className="rounded-full border border-slate-700 px-2 py-1">Last trade: {metrics.latestTradeTs ? new Date(metrics.latestTradeTs).toLocaleString() : '—'}</span>
+                <span className="rounded-full border border-slate-700 px-2 py-1">Position Value: {formatUsd(overview?.portfolio?.positionsValue, 0)}</span>
+                <span className="rounded-full border border-slate-700 px-2 py-1">Position Cost: {formatUsd(overview?.portfolio?.positionsInitialValue, 0)}</span>
+                <span className="rounded-full border border-slate-700 px-2 py-1">Position Cash PnL: {formatUsd(overview?.portfolio?.positionsCashPnl, 0)}</span>
+                <span className="rounded-full border border-slate-700 px-2 py-1">24h Portfolio: {formatUsd(history?.deltas?.portfolioValue24h, 0)}</span>
+                <span className="rounded-full border border-slate-700 px-2 py-1">7d Portfolio: {formatUsd(history?.deltas?.portfolioValue7d, 0)}</span>
                 <span className="rounded-full border border-slate-700 px-2 py-1">24h PnL: {formatUsd(history?.deltas?.pnl24h)}</span>
                 <span className="rounded-full border border-slate-700 px-2 py-1">7d PnL: {formatUsd(history?.deltas?.pnl7d)}</span>
-                <span className="rounded-full border border-slate-700 px-2 py-1">24h Vol: {formatUsd(history?.deltas?.volume24h, 0)}</span>
-                <span className="rounded-full border border-slate-700 px-2 py-1">7d Vol: {formatUsd(history?.deltas?.volume7d, 0)}</span>
-                {typeof displayedPnl !== 'number' && (
-                  <span className="rounded-full border border-amber-700/70 px-2 py-1 text-amber-300">
-                    PnL unavailable from public fills for this wallet
-                  </span>
-                )}
               </div>
             </GlassPanel>
 
             <section className="grid gap-4 lg:grid-cols-2">
               <GlassPanel className="rounded-2xl border border-slate-800/80 p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-white">Cumulative Trade Flow</h2>
-                  <span className="text-xs text-slate-500">Fill-based</span>
-                </div>
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={pnlCurve}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
-                      <XAxis dataKey="label" minTickGap={24} tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                      <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
-                      <Tooltip contentStyle={{ backgroundColor: '#020617', border: '1px solid #334155' }} />
-                      <Legend />
-                      <Line type="monotone" dataKey="cumulativeCashflow" stroke="#22c55e" strokeWidth={2} dot={false} name="Net cashflow" />
-                      <Line
-                        type="monotone"
-                        dataKey="cumulativeNotional"
-                        stroke="#60a5fa"
-                        strokeWidth={2}
-                        dot={false}
-                        name="Cumulative notional"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </GlassPanel>
-
-              <GlassPanel className="rounded-2xl border border-slate-800/80 p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-white">Analytics Trend</h2>
+                  <h2 className="text-base font-semibold text-white">Portfolio Tracker</h2>
                   <span className="text-xs text-slate-500">Snapshot-based</span>
                 </div>
                 <div className="h-72">
@@ -512,54 +463,18 @@ export default function TraderProfile() {
                       <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} />
                       <Tooltip contentStyle={{ backgroundColor: '#020617', border: '1px solid #334155' }} />
                       <Legend />
+                      {portfolioSeriesAvailable && (
+                        <Line type="monotone" dataKey="portfolioValue" stroke="#60a5fa" strokeWidth={2.4} dot={false} name="Portfolio value" />
+                      )}
                       <Line type="monotone" dataKey="pnl" stroke="#22c55e" strokeWidth={2} dot={false} name="PnL" />
                       <Line type="monotone" dataKey="notionalVolume" stroke="#f59e0b" strokeWidth={2} dot={false} name="Notional" />
-                      <Line type="monotone" dataKey="tradeCount" stroke="#60a5fa" strokeWidth={2} dot={false} name="Trades" />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </GlassPanel>
-            </section>
-
-            <section className="grid gap-4 lg:grid-cols-2">
-              <GlassPanel className="rounded-2xl border border-slate-800/80 p-4">
-                <h2 className="text-base font-semibold text-white">Top Markets By Notional</h2>
-                <div className="mt-3 overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-slate-400">
-                        <th className="px-2 py-2">Market</th>
-                        <th className="px-2 py-2 text-right">Trades</th>
-                        <th className="px-2 py-2 text-right">Notional</th>
-                        <th className="px-2 py-2 text-right">Buy/Sell</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {metrics.topMarkets.length === 0 && (
-                        <tr>
-                          <td className="px-2 py-3 text-slate-500" colSpan={4}>
-                            No market rows available.
-                          </td>
-                        </tr>
-                      )}
-                      {metrics.topMarkets.map((row) => (
-                        <tr key={row.market} className="border-t border-slate-800/70">
-                          <td className="px-2 py-2 text-slate-200">{row.market}</td>
-                          <td className="px-2 py-2 text-right text-slate-300">{row.trades}</td>
-                          <td className="px-2 py-2 text-right text-slate-300">{formatUsd(row.notional, 0)}</td>
-                          <td className="px-2 py-2 text-right text-slate-300">
-                            {row.buy}/{row.sell}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </GlassPanel>
 
               <GlassPanel className="rounded-2xl border border-slate-800/80 p-4">
-                <h2 className="text-base font-semibold text-white">Open Positions (Derived)</h2>
-                {overview?.openOrders?.note && <p className="mt-1 text-xs text-slate-500">{overview.openOrders.note}</p>}
+                <h2 className="text-base font-semibold text-white">Positions</h2>
                 <div className="mt-3 overflow-x-auto">
                   <table className="min-w-full text-sm">
                     <thead>
@@ -567,26 +482,26 @@ export default function TraderProfile() {
                         <th className="px-2 py-2">Market</th>
                         <th className="px-2 py-2">Side</th>
                         <th className="px-2 py-2 text-right">Size</th>
-                        <th className="px-2 py-2 text-right">Avg Price</th>
+                        <th className="px-2 py-2 text-right">Current</th>
+                        <th className="px-2 py-2 text-right">Cash PnL</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {!overview?.openOrders?.openOrders?.length && (
+                      {(overview?.positions?.positions || []).length === 0 && (
                         <tr>
-                          <td className="px-2 py-3 text-slate-500" colSpan={4}>
-                            No open positions found.
+                          <td className="px-2 py-3 text-slate-500" colSpan={5}>
+                            No positions returned by source.
                           </td>
                         </tr>
                       )}
-                      {overview?.openOrders?.openOrders?.map((row, index) => (
-                        <tr key={`${row.market || 'market'}-${index}`} className="border-t border-slate-800/70">
-                          <td className="px-2 py-2 text-slate-200">{row.market || 'Unknown'}</td>
+                      {(overview?.positions?.positions || []).slice(0, 40).map((row, index) => (
+                        <tr key={`${row.market}-${index}`} className="border-t border-slate-800/70">
+                          <td className="px-2 py-2 text-slate-200">{row.market}</td>
                           <td className="px-2 py-2 text-slate-300 uppercase">{row.side || '—'}</td>
-                          <td className="px-2 py-2 text-right text-slate-300">
-                            {typeof row.size === 'number' ? row.size.toFixed(4) : '—'}
-                          </td>
-                          <td className="px-2 py-2 text-right text-slate-300">
-                            {typeof row.price === 'number' ? row.price.toFixed(4) : '—'}
+                          <td className="px-2 py-2 text-right text-slate-300">{Number(row.size || 0).toFixed(4)}</td>
+                          <td className="px-2 py-2 text-right text-slate-300">{formatUsd(row.currentValue, 2)}</td>
+                          <td className={`px-2 py-2 text-right ${Number(row.cashPnl || 0) >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+                            {formatUsd(row.cashPnl, 2)}
                           </td>
                         </tr>
                       ))}
