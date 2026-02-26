@@ -4,6 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar, Legend
 } from 'recharts';
 import type { Trade } from '../hooks/useLiveTrades';
+import PolymarketLoading from './PolymarketLoading';
 
 
 
@@ -315,7 +316,11 @@ export function TraderDashboard({ address }: { address: string }) {
         </div>
       </div>
       {/* TODO: Add charts/visualizations here */}
-      {isLoading && <div className="text-slate-400 text-center">Loading…</div>}
+      {isLoading && (
+        <div className="rounded-xl border border-slate-800/60 bg-slate-900/50">
+          <PolymarketLoading compact label="Loading PolyCopy Trader Data" />
+        </div>
+      )}
       {error && <div className="text-rose-400 text-center">{error}</div>}
 
     </section>
@@ -456,7 +461,11 @@ export function TraderDashboard({ address }: { address: string }) {
         </div>
       </div>
       {/* TODO: Add charts/visualizations here */}
-      {isLoading && <div className="text-slate-400 text-center">Loading…</div>}
+      {isLoading && (
+        <div className="rounded-xl border border-slate-800/60 bg-slate-900/50">
+          <PolymarketLoading compact label="Loading PolyCopy Trader Data" />
+        </div>
+      )}
       {error && <div className="text-rose-400 text-center">{error}</div>}
     </section>
   );

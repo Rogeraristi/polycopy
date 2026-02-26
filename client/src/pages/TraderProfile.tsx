@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import GlassPanel from '../components/effects/GlassPanel';
+import PolymarketLoading from '../components/PolymarketLoading';
 import type { Trade } from '../hooks/useLiveTrades';
 
 type LeaderboardContextEntry = {
@@ -401,7 +402,11 @@ export default function TraderProfile() {
           </div>
         </GlassPanel>
 
-        {loading && <GlassPanel className="rounded-2xl border border-slate-800/80 p-4 text-sm text-slate-300">Loading profile data…</GlassPanel>}
+        {loading && (
+          <GlassPanel className="rounded-2xl border border-slate-800/80 p-4">
+            <PolymarketLoading compact label="Loading PolyCopy Profile Data" />
+          </GlassPanel>
+        )}
         {error && <GlassPanel className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-200">{error}</GlassPanel>}
 
         {!loading && !error && (

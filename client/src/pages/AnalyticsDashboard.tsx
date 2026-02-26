@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import GlassPanel from '../components/effects/GlassPanel';
+import PolymarketLoading from '../components/PolymarketLoading';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 type AnalyticsSnapshot = {
@@ -388,7 +389,11 @@ export default function AnalyticsDashboard() {
               {periodLabels[selectedPeriod] || selectedPeriod}
             </span>
           </div>
-          {isLeaderboardLoading && <p className="text-sm text-slate-400">Loading leaderboard snapshot…</p>}
+          {isLeaderboardLoading && (
+            <div className="rounded-2xl border border-slate-800/60 bg-slate-900/40">
+              <PolymarketLoading compact label="Loading PolyCopy Leaderboard" />
+            </div>
+          )}
           <div className="grid gap-3 md:grid-cols-2">
             {traderInsights.map((entry) => (
               <button
@@ -471,7 +476,11 @@ export default function AnalyticsDashboard() {
                 </div>
               </div>
             )}
-            {isHistoryLoading && <p className="text-sm text-slate-400">Loading history…</p>}
+            {isHistoryLoading && (
+              <div className="rounded-2xl border border-slate-800/60 bg-slate-900/40">
+                <PolymarketLoading compact label="Loading PolyCopy Trader History" />
+              </div>
+            )}
             {!isHistoryLoading && selectedHistory.length === 0 && (
               <p className="text-sm text-slate-400">No history captured yet for this trader.</p>
             )}

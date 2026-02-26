@@ -7,6 +7,7 @@ import { TraderSearch } from './components/TraderSearch';
 import MetallicLogo from './components/MetallicLogo';
 import Beams from './components/effects/Beams';
 import GlassPanel from './components/effects/GlassPanel';
+import PolymarketLoading from './components/PolymarketLoading';
 import { useSession } from './hooks/useSession';
 import { useTraderSearch } from './hooks/useTraderSearch';
 import { useWalletConnection } from './hooks/useWalletConnection';
@@ -635,86 +636,6 @@ function LeaderboardPage() {
   );
 }
 
-function AppLoaderSplash({ fadeOut }: { fadeOut: boolean }) {
-  return (
-    <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center bg-[#020611] transition-opacity duration-700 ease-in-out ${
-        fadeOut ? 'pointer-events-none opacity-0' : 'opacity-100'
-      }`}
-      aria-hidden="true"
-    >
-      <div className="flex flex-col items-center gap-5">
-        <div className="relative h-[220px] w-[180px]">
-          <div className="absolute inset-0 rounded-[60px] bg-white/10 blur-2xl" />
-          <svg
-            viewBox="0 0 146 198"
-            className="absolute inset-0 h-full w-full"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <g className="polycopy-loader-spin">
-              <path
-                className="polycopy-loader-leaf polycopy-loader-leaf-1"
-                d="M65.1273 14.4213L60.6817 14.4213C46.8998 14.4213 33.5637 19.7561 24.2288 29.091C16.2269 37.0929 11.7811 47.7628 11.5596 58.6544L11.5596 62.2115C11.5596 65.7687 14.2266 68.4357 17.7839 68.4358L21.7844 68.4358C35.5663 68.4358 48.9024 63.101 58.2373 53.7661C66.2392 45.7642 70.685 35.0943 70.9065 24.2027L70.9066 20.6456C71.3508 17.0892 68.6829 14.4214 65.1273 14.4213Z"
-              />
-              <path
-                className="polycopy-loader-leaf polycopy-loader-leaf-2"
-                d="M80.5343 14.4213L84.9799 14.4213C98.7618 14.4213 112.098 19.7561 121.433 29.091C129.435 37.0929 133.881 47.7628 134.102 58.6544L134.102 62.2115C134.102 65.7687 131.435 68.4357 127.878 68.4358L123.877 68.4358C110.095 68.4358 96.7592 63.101 87.4243 53.7661C79.4224 45.7642 74.9766 35.0943 74.7551 24.2027L74.7551 20.6456C74.3108 17.0892 76.9787 14.4214 80.5343 14.4213Z"
-              />
-              <path
-                className="polycopy-loader-leaf polycopy-loader-leaf-3"
-                d="M80.5343 126.241L84.9799 126.241C98.7618 126.241 112.098 120.906 121.433 111.571C129.435 103.569 133.881 92.8993 134.102 82.0077L134.102 78.4506C134.102 74.8934 131.435 72.2264 127.878 72.2263L123.877 72.2263C110.095 72.2263 96.7592 77.5611 87.4243 86.896C79.4224 94.8979 74.9766 105.568 74.7551 116.459L74.7551 120.017C74.3108 123.573 76.9787 126.241 80.5343 126.241Z"
-              />
-              <path
-                className="polycopy-loader-leaf polycopy-loader-leaf-4"
-                d="M65.1273 72.4213L60.6817 72.4213C46.8998 72.4213 33.5637 77.7561 24.2288 87.091C16.2269 95.0929 11.7811 105.763 11.5596 116.654L11.5596 120.212C11.5596 123.769 14.2266 126.436 17.7839 126.436L21.7844 126.436C35.5663 126.436 48.9024 121.101 58.2373 111.766C66.2392 103.764 70.685 93.0943 70.9065 82.2027L70.9066 78.6456C71.3508 75.0892 68.6829 72.4214 65.1273 72.4213Z"
-              />
-              <path
-                className="polycopy-loader-leaf polycopy-loader-leaf-5"
-                d="M65.1273 129.421L60.6817 129.421C46.8998 129.421 33.5637 134.756 24.2288 144.091C16.2269 152.093 11.7811 162.763 11.5596 173.654L11.5596 177.212C11.5596 180.769 14.2266 183.436 17.7839 183.436L21.7844 183.436C35.5663 183.436 48.9024 178.101 58.2373 168.766C66.2392 160.764 70.685 150.094 70.9065 139.203L70.9066 135.646C71.3508 132.089 68.6829 129.421 65.1273 129.421Z"
-              />
-            </g>
-          </svg>
-        </div>
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">Polymarket Loading</p>
-      </div>
-      <style>{`
-        .polycopy-loader-spin {
-          transform-origin: 73px 99px;
-          animation: polycopy-loader-drift 2.4s ease-in-out infinite;
-        }
-        .polycopy-loader-leaf {
-          fill: #ffffff;
-          transform-origin: 73px 99px;
-          animation: polycopy-loader-flow 2.4s ease-in-out infinite;
-          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.2));
-        }
-        .polycopy-loader-leaf-1 { animation-delay: 0s; }
-        .polycopy-loader-leaf-2 { animation-delay: .12s; }
-        .polycopy-loader-leaf-3 { animation-delay: .24s; }
-        .polycopy-loader-leaf-4 { animation-delay: .36s; }
-        .polycopy-loader-leaf-5 { animation-delay: .48s; }
-        @keyframes polycopy-loader-flow {
-          0%, 100% {
-            opacity: .62;
-            transform: translate3d(0, 1.5px, 0) scale(0.985);
-          }
-          50% {
-            opacity: 1;
-            transform: translate3d(0, -1.5px, 0) scale(1.015);
-          }
-        }
-        @keyframes polycopy-loader-drift {
-          0%, 100% { transform: translate3d(0, 0, 0); }
-          25% { transform: translate3d(1px, -1px, 0); }
-          50% { transform: translate3d(0, -2px, 0); }
-          75% { transform: translate3d(-1px, -1px, 0); }
-        }
-      `}</style>
-    </div>
-  );
-}
-
 export default function App() {
   const [showInitialLoader, setShowInitialLoader] = useState(true);
   const [fadeOutLoader, setFadeOutLoader] = useState(false);
@@ -737,7 +658,7 @@ export default function App() {
 
   return (
     <>
-      {showInitialLoader && <AppLoaderSplash fadeOut={fadeOutLoader} />}
+      {showInitialLoader && <PolymarketLoading fullscreen fadeOut={fadeOutLoader} />}
       <Router>
         <Routes>
           <Route path="/" element={<HomePage />} />
