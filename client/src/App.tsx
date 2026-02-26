@@ -419,7 +419,7 @@ function HomePage() {
       </div>
       {/* Removed or reduced radial gradient overlay to minimize fill behind navbar */}
       <div className="relative z-10 mx-auto max-w-7xl px-3 pb-16 pt-4 space-y-10 sm:px-6 sm:pb-20 sm:pt-8 sm:space-y-14">
-        <div className="sticky top-0 z-30 flex flex-col gap-2 backdrop-blur-md transition-all duration-300 shadow-md">
+        <div className="sticky top-0 z-30 flex flex-col gap-2 rounded-[22px] bg-transparent transition-all duration-300">
           <TopNav
             currentPath="/"
             advancedGlass
@@ -569,7 +569,7 @@ function LeaderboardPage() {
     <div className="min-h-screen bg-[#040712] text-slate-100">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top,rgba(49,114,255,0.22),transparent_52%)]" />
       <div className="relative z-10 mx-auto max-w-7xl px-3 pb-16 pt-4 space-y-8 sm:px-6 sm:pb-20 sm:pt-8 sm:space-y-10">
-        <div className="sticky top-0 z-30 flex flex-col gap-2 transition-all duration-300 shadow-md">
+        <div className="sticky top-0 z-30 flex flex-col gap-2 rounded-[22px] bg-transparent transition-all duration-300">
           <TopNav
             currentPath="/leaderboard"
             advancedGlass
@@ -643,7 +643,21 @@ function AppLoaderSplash({ fadeOut }: { fadeOut: boolean }) {
       }`}
       aria-hidden="true"
     >
-      <img src="/polycopy-loader.gif" alt="Loading PolyCopy" className="h-36 w-36 rounded-2xl" />
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative">
+          <div
+            className="absolute inset-0 rounded-full bg-blue-500/20 blur-xl"
+            style={{ transform: 'scale(1.2)', animation: 'pulse 1.4s ease-in-out infinite' }}
+          />
+          <img
+            src="/P_logo.svg"
+            alt="Loading PolyCopy"
+            className="relative h-28 w-28"
+            style={{ animation: 'spin 1.25s linear infinite' }}
+          />
+        </div>
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">Polymarket Loading</p>
+      </div>
     </div>
   );
 }
