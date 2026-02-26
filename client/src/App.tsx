@@ -635,17 +635,55 @@ function LeaderboardPage() {
   );
 }
 
-export default function App() {
+function AppLoaderSplash({ fadeOut }: { fadeOut: boolean }) {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/leaderboard" element={<LeaderboardPage />} />
-        <Route path="/analytics" element={<AnalyticsDashboard />} />
-        <Route path="/profile/:address" element={<TraderProfile />} />
-        <Route path="/logo-preview" element={<MetallicLogoPreviewPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Router>
+    <div
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-[#020611] transition-opacity duration-500 ${
+        fadeOut ? 'pointer-events-none opacity-0' : 'opacity-100'
+      }`}
+      aria-hidden="true"
+    >
+      <div className="flex flex-col items-center gap-4">
+        <img src="/polycopy-loader.gif" alt="Loading PolyCopy" className="h-28 w-28 rounded-2xl" />
+        <p className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-300">Loading PolyCopy</p>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [showInitialLoader, setShowInitialLoader] = useState(true);
+  const [fadeOutLoader, setFadeOutLoader] = useState(false);
+
+  useEffect(() => {
+    const splashDurationMs = 1450;
+    const fadeDurationMs = 500;
+    const fadeTimer = window.setTimeout(() => {
+      setFadeOutLoader(true);
+    }, splashDurationMs);
+    const hideTimer = window.setTimeout(() => {
+      setShowInitialLoader(false);
+    }, splashDurationMs + fadeDurationMs);
+
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, []);
+
+  return (
+    <>
+      {showInitialLoader && <AppLoaderSplash fadeOut={fadeOutLoader} />}
+      <Router>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/analytics" element={<AnalyticsDashboard />} />
+          <Route path="/profile/:address" element={<TraderProfile />} />
+          <Route path="/logo-preview" element={<MetallicLogoPreviewPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </>
   );
 }
