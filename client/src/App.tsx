@@ -638,27 +638,20 @@ function LeaderboardPage() {
 function AppLoaderSplash({ fadeOut }: { fadeOut: boolean }) {
   return (
     <div
-      className={`fixed inset-0 z-[100] flex items-center justify-center bg-[#020611] transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[100] flex items-center justify-center bg-[#020611] transition-opacity duration-700 ease-in-out ${
         fadeOut ? 'pointer-events-none opacity-0' : 'opacity-100'
       }`}
       aria-hidden="true"
     >
       <div className="flex flex-col items-center gap-5">
         <div className="relative h-[220px] w-[180px]">
-          <div className="absolute inset-0 rounded-[60px] bg-blue-500/20 blur-2xl" />
+          <div className="absolute inset-0 rounded-[60px] bg-white/10 blur-2xl" />
           <svg
             viewBox="0 0 146 198"
             className="absolute inset-0 h-full w-full"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
           >
-            <defs>
-              <linearGradient id="polycopy-loader-grad" x1="12" y1="18" x2="132" y2="180" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stopColor="#B9D5FF" />
-                <stop offset="45%" stopColor="#4A89FF" />
-                <stop offset="100%" stopColor="#FFFFFF" />
-              </linearGradient>
-            </defs>
             <g className="polycopy-loader-spin">
               <path
                 className="polycopy-loader-leaf polycopy-loader-leaf-1"
@@ -688,27 +681,34 @@ function AppLoaderSplash({ fadeOut }: { fadeOut: boolean }) {
       <style>{`
         .polycopy-loader-spin {
           transform-origin: 73px 99px;
-          animation: polycopy-loader-orbit 4.2s ease-in-out infinite;
+          animation: polycopy-loader-drift 2.4s ease-in-out infinite;
         }
         .polycopy-loader-leaf {
-          fill: url(#polycopy-loader-grad);
+          fill: #ffffff;
           transform-origin: 73px 99px;
-          animation: polycopy-loader-pulse 1.65s ease-in-out infinite;
-          filter: drop-shadow(0 0 12px rgba(74, 137, 255, 0.35));
+          animation: polycopy-loader-flow 2.4s ease-in-out infinite;
+          filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.2));
         }
         .polycopy-loader-leaf-1 { animation-delay: 0s; }
-        .polycopy-loader-leaf-2 { animation-delay: .14s; }
-        .polycopy-loader-leaf-3 { animation-delay: .28s; }
-        .polycopy-loader-leaf-4 { animation-delay: .42s; }
-        .polycopy-loader-leaf-5 { animation-delay: .56s; }
-        @keyframes polycopy-loader-pulse {
-          0%, 100% { opacity: .68; transform: scale(0.96); }
-          45% { opacity: 1; transform: scale(1.06); }
+        .polycopy-loader-leaf-2 { animation-delay: .12s; }
+        .polycopy-loader-leaf-3 { animation-delay: .24s; }
+        .polycopy-loader-leaf-4 { animation-delay: .36s; }
+        .polycopy-loader-leaf-5 { animation-delay: .48s; }
+        @keyframes polycopy-loader-flow {
+          0%, 100% {
+            opacity: .62;
+            transform: translate3d(0, 1.5px, 0) scale(0.985);
+          }
+          50% {
+            opacity: 1;
+            transform: translate3d(0, -1.5px, 0) scale(1.015);
+          }
         }
-        @keyframes polycopy-loader-orbit {
-          0%, 100% { transform: rotate(0deg); }
-          35% { transform: rotate(8deg); }
-          65% { transform: rotate(-8deg); }
+        @keyframes polycopy-loader-drift {
+          0%, 100% { transform: translate3d(0, 0, 0); }
+          25% { transform: translate3d(1px, -1px, 0); }
+          50% { transform: translate3d(0, -2px, 0); }
+          75% { transform: translate3d(-1px, -1px, 0); }
         }
       `}</style>
     </div>
@@ -720,8 +720,8 @@ export default function App() {
   const [fadeOutLoader, setFadeOutLoader] = useState(false);
 
   useEffect(() => {
-    const splashDurationMs = 1450;
-    const fadeDurationMs = 500;
+    const splashDurationMs = 2600; // one full animation cycle
+    const fadeDurationMs = 700;
     const fadeTimer = window.setTimeout(() => {
       setFadeOutLoader(true);
     }, splashDurationMs);
