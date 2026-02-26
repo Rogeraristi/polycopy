@@ -23,7 +23,6 @@ export default function PolymarketLoading({
     <div className={wrapperClass} aria-hidden="true">
       <div className="flex flex-col items-center gap-5">
         <div className={`relative ${logoSizeClass}`}>
-          <div className="absolute inset-0 rounded-[60px] bg-white/10 blur-2xl" />
           <svg viewBox="0 0 146 198" className="absolute inset-0 h-full w-full" fill="none" xmlns="http://www.w3.org/2000/svg">
             <g className="polycopy-loader-spin">
               <path
@@ -60,11 +59,7 @@ export default function PolymarketLoading({
           fill: #ffffff;
           transform-origin: 73px 99px;
           animation: polycopy-loader-pulse 2.6s ease-in-out infinite;
-          filter:
-            brightness(1.18)
-            drop-shadow(0 0 6px rgba(255, 255, 255, 0.65))
-            drop-shadow(0 0 16px rgba(255, 255, 255, 0.45))
-            drop-shadow(0 0 28px rgba(255, 255, 255, 0.25));
+          filter: none;
         }
         .polycopy-loader-leaf-1 { animation-delay: 0s; }
         .polycopy-loader-leaf-2 { animation-delay: .14s; }
