@@ -190,7 +190,11 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
           fill: #ffffff;
           transform-origin: 73px 99px;
           animation: polycopy-loader-pulse 2.6s ease-in-out infinite;
-          filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.25));
+          filter:
+            brightness(1.18)
+            drop-shadow(0 0 6px rgba(255, 255, 255, 0.65))
+            drop-shadow(0 0 16px rgba(255, 255, 255, 0.45))
+            drop-shadow(0 0 28px rgba(255, 255, 255, 0.25));
         }
         .polycopy-loader-leaf-1 { animation-delay: 0s; }
         .polycopy-loader-leaf-2 { animation-delay: .14s; }
@@ -198,7 +202,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
         .polycopy-loader-leaf-4 { animation-delay: .42s; }
         .polycopy-loader-leaf-5 { animation-delay: .56s; }
         @keyframes polycopy-loader-pulse {
-          0%, 100% { opacity: .68; transform: scale(0.96); }
+          0%, 100% { opacity: .74; transform: scale(0.96); }
           45% { opacity: 1; transform: scale(1.06); }
         }
         @keyframes polycopy-loader-orbit {
